@@ -2,37 +2,77 @@
 
 결혼식의 소중한 순간을 하객과 함께 모으고, 오래도록 간직하는 디지털 웨딩 앨범입니다.
 
-## 기능 (예정)
+## 프로젝트 구조
 
-- 웨딩 앨범 생성 및 초대 링크 공유
-- 하객 사진·메시지 업로드
-- QR 코드로 현장 참여
-- 추억 타임라인 및 갤러리
+```text
+Memory-Wedding/
+├── src/                  # Next.js Frontend
+├── backend/              # Spring Boot Backend
+├── docs/                 # 설계 문서
+├── docker-compose.yml    # MySQL (로컬)
+└── README.md
+```
 
 ## 기술 스택
 
-- [Next.js 15](https://nextjs.org/) (App Router)
-- [React 19](https://react.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Tailwind CSS 4](https://tailwindcss.com/)
+| 영역 | 기술 |
+|------|------|
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS 4 |
+| Backend | Java 21, Spring Boot 3.4, Spring Data JPA, Spring Security |
+| Database | MySQL 8.4 |
+| Storage | Google Drive API (예정) |
+
+상세: [`docs/tech-stack.md`](docs/tech-stack.md)
 
 ## 시작하기
+
+### 1. 환경 변수
+
+```bash
+cp .env.example .env.local
+```
+
+### 2. MySQL (Docker)
+
+```bash
+docker compose up -d
+```
+
+### 3. Frontend
 
 ```bash
 npm install
 npm run dev
 ```
 
-브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
+→ [http://localhost:3000](http://localhost:3000)
 
-## 스크립트
+### 4. Backend
 
-| 명령어 | 설명 |
+```bash
+cd backend
+./gradlew bootRun
+```
+
+→ [http://localhost:8080/api/health](http://localhost:8080/api/health)
+
+## 설계 문서
+
+| 문서 | 설명 |
+|------|------|
+| [`docs/requirements-spec.md`](docs/requirements-spec.md) | 기능 요구사항 |
+| [`docs/ui-ux-design.md`](docs/ui-ux-design.md) | UI/UX 설계 |
+| [`docs/erd.md`](docs/erd.md) | ERD |
+| [`docs/system-flow.md`](docs/system-flow.md) | 시스템 흐름도 |
+| [`docs/tech-stack.md`](docs/tech-stack.md) | 기술 스택 |
+
+## 브랜치 전략
+
+| 브랜치 | 용도 |
 |--------|------|
-| `npm run dev` | 개발 서버 실행 |
-| `npm run build` | 프로덕션 빌드 |
-| `npm run start` | 프로덕션 서버 실행 |
-| `npm run lint` | ESLint 실행 |
+| `main` | Production |
+| `dev` | Development 통합 |
+| `feat/*` | 기능별 작업 |
 
 ## 라이선스
 
