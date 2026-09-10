@@ -90,6 +90,12 @@ backend/src/main/java/com/memorywedding/
 - 헬퍼: `src/lib/daum-postcode.ts`
 - 동작: 「주소 검색」→ 팝업 → 도로명/지번 주소 입력. 건물명이 있고 예식장명이 비어 있으면 예식장명 자동 채움
 
+### 4.3 예식 일시 (타임존)
+
+- Backend `weddingAt`은 **LocalDateTime** (벽시계, 타임존 없음)
+- 프론트는 `Date#toISOString()`을 쓰지 않는다 (UTC로 밀려 시각이 어긋남)
+- `src/lib/datetime.ts`: API 전송 `YYYY-MM-DDTHH:mm:ss`, 표시는 시:분까지
+
 ## 5. 커밋 이력 (`feat/wedding-project`)
 
 1. `feat: add wedding project CRUD and invite sharing`

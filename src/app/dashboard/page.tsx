@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
+import { formatWeddingDateTime } from "@/lib/datetime";
 import type { WeddingProject } from "@/types";
 
 type Member = {
@@ -110,7 +111,7 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <p className="text-sm text-muted">
-                    {new Date(project.weddingAt).toLocaleString("ko-KR")}
+                    {formatWeddingDateTime(project.weddingAt)}
                     {project.venueName ? ` · ${project.venueName}` : ""}
                   </p>
                 </Link>

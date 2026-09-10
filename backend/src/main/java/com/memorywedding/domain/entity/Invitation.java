@@ -37,8 +37,11 @@ public class Invitation extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean published;
 
-    @Column(length = 500)
+    @Column(length = 1000)
     private String mapUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String accountInfo;
 
     @Builder
     public Invitation(WeddingProject project, String title, String greetingMessage) {
@@ -46,5 +49,16 @@ public class Invitation extends BaseTimeEntity {
         this.title = title;
         this.greetingMessage = greetingMessage;
         this.published = false;
+    }
+
+    public void updateContent(String title, String greetingMessage, String mapUrl, String accountInfo) {
+        this.title = title;
+        this.greetingMessage = greetingMessage;
+        this.mapUrl = mapUrl;
+        this.accountInfo = accountInfo;
+    }
+
+    public void setPublished(boolean published) {
+        this.published = published;
     }
 }

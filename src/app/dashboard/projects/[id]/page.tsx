@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { formatWeddingDateTime } from "@/lib/datetime";
 import type { WeddingProject } from "@/types";
 
 export default function ProjectDetailPage() {
@@ -69,13 +70,15 @@ export default function ProjectDetailPage() {
         {project.groomName} ♥ {project.brideName}
       </h1>
       <p className="mb-8 text-muted">
-        {new Date(project.weddingAt).toLocaleString("ko-KR")}
+        {formatWeddingDateTime(project.weddingAt)}
         {project.venueName ? ` · ${project.venueName}` : ""}
       </p>
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2">
         <NavCard href={`/dashboard/projects/${project.id}/edit`} title="기본 정보 수정" />
+        <NavCard href={`/dashboard/projects/${project.id}/invitation`} title="청첩장 편집" />
         <NavCard href={`/dashboard/projects/${project.id}/share`} title="하객 초대 / QR" />
+        <NavCard href={`/w/${project.slug}`} title="청첩장 미리보기" />
       </div>
 
       <dl className="mb-8 space-y-3 rounded-2xl border border-accent/20 bg-white/60 p-6 text-sm">

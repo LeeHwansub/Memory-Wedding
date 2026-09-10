@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { AddressSearchField } from "@/components/ui/AddressSearchField";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { toApiLocalDateTime } from "@/lib/datetime";
 import type { WeddingProject } from "@/types";
 
 export default function NewProjectPage() {
@@ -35,7 +36,7 @@ export default function NewProjectPage() {
         body: JSON.stringify({
           groomName,
           brideName,
-          weddingAt: new Date(weddingAt).toISOString(),
+          weddingAt: toApiLocalDateTime(weddingAt),
           venueName: venueName || undefined,
           venueAddress: venueAddress || undefined,
         }),

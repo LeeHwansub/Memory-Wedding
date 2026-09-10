@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { AddressSearchField } from "@/components/ui/AddressSearchField";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { toApiLocalDateTime, toDatetimeLocalValue } from "@/lib/datetime";
 import type { ProjectStatus, WeddingProject } from "@/types";
 
 export default function EditProjectPage() {
@@ -33,7 +34,7 @@ export default function EditProjectPage() {
         if (!project) return;
         setGroomName(project.groomName);
         setBrideName(project.brideName);
-        setWeddingAt(toLocalInputValue(project.weddingAt));
+        setWeddingAt(toDatetimeLocalValue(project.weddingAt));
         setVenueName(project.venueName ?? "");
         setVenueAddress(project.venueAddress ?? "");
         setStatus(project.status);
@@ -53,7 +54,7 @@ export default function EditProjectPage() {
         body: JSON.stringify({
           groomName,
           brideName,
-          weddingAt: new Date(weddingAt).toISOString(),
+          weddingAt: toApiLocalDateTime(weddingAt),
           venueName: venueName || undefined,
           venueAddress: venueAddress || undefined,
           status,
@@ -162,10 +163,4 @@ function Field({
       />
     </label>
   );
-}
-
-function toLocalInputValue(iso: string) {
-  const date = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

@@ -43,3 +43,24 @@ export async function apiFetch<T>(
 
   return response.json();
 }
+
+export async function apiPublicFetch<T>(path: string): Promise<ApiResponse<T>> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    let message = `API error: ${response.status}`;
+    try {
+      const body = (await response.json()) as ApiResponse<unknown>;
+      if (body.message) {
+        message = body.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}

@@ -41,6 +41,13 @@ Google / Naver / Kakao Developer Console에서 Redirect URI 등록:
 
 Kakao 동의항목은 **닉네임만** 사용합니다. (이메일 미요청, `kakao_{id}@kakao.local`로 저장)
 
+### 카카오맵 (오시는 길)
+
+1. [Kakao Developers](https://developers.kakao.com) → 내 애플리케이션 → **앱 키 → JavaScript 키** 복사
+2. `.env`에 `NEXT_PUBLIC_KAKAO_MAP_APP_KEY=` 로 설정
+3. 앱 설정 → 플랫폼 → Web에 `http://localhost:3000` 등록
+4. (선택) 카카오맵 API 사용 설정 활성화
+
 `.env` 파일에 Client ID/Secret 입력 후 `docker compose up -d --build` 재실행.
 
 ### Docker 명령어
