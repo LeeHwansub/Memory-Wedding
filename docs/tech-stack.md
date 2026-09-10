@@ -78,8 +78,12 @@ Memory-Wedding/
 | 기술 | 용도 |
 |------|------|
 | Git / GitHub | 버전 관리 |
-| Docker | Backend·DB 컨테이너 |
+| Docker Compose | MySQL + Backend + Frontend 통합 관리 |
 | GitHub Actions | CI/CD (추후) |
+
+```bash
+docker compose up -d --build   # 전체 스택 실행
+```
 
 ---
 

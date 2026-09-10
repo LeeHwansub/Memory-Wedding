@@ -20,12 +20,12 @@ export default function Home() {
         </p>
 
         <div className="flex flex-col gap-4 sm:flex-row">
-          <button
-            type="button"
+          <a
+            href="/login"
             className="rounded-full bg-accent px-8 py-3 text-sm font-medium text-white transition hover:opacity-90"
           >
-            앨범 만들기
-          </button>
+            시작하기
+          </a>
           <button
             type="button"
             className="rounded-full border border-accent/40 bg-accent-soft px-8 py-3 text-sm font-medium text-foreground transition hover:bg-accent/10"

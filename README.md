@@ -9,8 +9,67 @@ Memory-Wedding/
 ├── src/                  # Next.js Frontend
 ├── backend/              # Spring Boot Backend
 ├── docs/                 # 설계 문서
-├── docker-compose.yml    # MySQL (로컬)
+├── docker-compose.yml    # 전체 스택 (MySQL + Backend + Frontend)
 └── README.md
+```
+
+## Docker로 전체 실행 (권장)
+
+```bash
+# 1. 환경 변수 설정
+cp .env.example .env
+# .env 파일에 OAuth Client ID/Secret 입력
+
+# 2. 전체 스택 실행
+docker compose up -d --build
+
+# 3. 확인
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8080/api/health
+# MySQL:    localhost:3306
+```
+
+### OAuth 설정
+
+Google / Naver Developer Console에서 Redirect URI 등록:
+
+| Provider | Redirect URI |
+|----------|--------------|
+| Google | `http://localhost:8080/login/oauth2/code/google` |
+| Naver | `http://localhost:8080/login/oauth2/code/naver` |
+
+`.env` 파일에 Client ID/Secret 입력 후 `docker compose up -d --build` 재실행.
+
+### Docker 명령어
+
+```bash
+docker compose up -d          # 백그라운드 실행
+docker compose logs -f        # 로그 확인
+docker compose down           # 중지
+docker compose down -v        # 중지 + DB 데이터 삭제
+```
+
+## 로컬 개발 (Docker 없이)
+
+### MySQL
+
+```bash
+docker compose up -d mysql
+```
+
+### Frontend
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+### Backend
+
+```bash
+cd backend
+./gradlew bootRun
 ```
 
 ## 기술 스택
@@ -18,43 +77,20 @@ Memory-Wedding/
 | 영역 | 기술 |
 |------|------|
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS 4 |
-| Backend | Java 21, Spring Boot 3.4, Spring Data JPA, Spring Security |
+| Backend | Java 21, Spring Boot 3.4, Spring Security OAuth2, JWT |
 | Database | MySQL 8.4 |
-| Storage | Google Drive API (예정) |
+| Infra | Docker Compose |
 
 상세: [`docs/tech-stack.md`](docs/tech-stack.md)
 
-## 시작하기
+## API (회원)
 
-### 1. 환경 변수
-
-```bash
-cp .env.example .env.local
-```
-
-### 2. MySQL (Docker)
-
-```bash
-docker compose up -d
-```
-
-### 3. Frontend
-
-```bash
-npm install
-npm run dev
-```
-
-→ [http://localhost:3000](http://localhost:3000)
-
-### 4. Backend
-
-```bash
-cd backend
-./gradlew bootRun
-```
-
-→ [http://localhost:8080/api/health](http://localhost:8080/api/health)
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/oauth2/authorization/{google\|naver}` | OAuth 로그인 |
+| GET | `/api/members/me` | 내 프로필 조회 |
+| PATCH | `/api/members/me` | 프로필 수정 |
+| DELETE | `/api/members/me` | 회원 탈퇴 |
 
 ## 설계 문서
 
@@ -64,7 +100,6 @@ cd backend
 | [`docs/ui-ux-design.md`](docs/ui-ux-design.md) | UI/UX 설계 |
 | [`docs/erd.md`](docs/erd.md) | ERD |
 | [`docs/system-flow.md`](docs/system-flow.md) | 시스템 흐름도 |
-| [`docs/tech-stack.md`](docs/tech-stack.md) | 기술 스택 |
 
 ## 브랜치 전략
 
