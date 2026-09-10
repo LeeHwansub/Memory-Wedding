@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { GuestbookCarousel } from "@/components/guestbook/GuestbookCarousel";
 import { KakaoMap } from "@/components/ui/KakaoMap";
 import { apiPublicFetch } from "@/lib/api";
 import { toDatetimeLocalValue } from "@/lib/datetime";
@@ -158,7 +159,7 @@ export default function PublicInvitationPage() {
         )}
 
         {data.accounts?.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-16">
             <SectionLabel>Account</SectionLabel>
             <ul className="mx-auto max-w-sm divide-y divide-[#C9A87C]/20 text-left">
               {data.accounts.map((account, index) => (
@@ -183,7 +184,9 @@ export default function PublicInvitationPage() {
           </div>
         )}
 
-        <div className="mt-auto flex flex-col gap-3 pt-14">
+        <GuestbookCarousel slug={data.slug} />
+
+        <div className="mt-auto flex flex-col gap-3 pt-6">
           <Link
             href={`/w/${data.slug}/guestbook`}
             className="rounded-full bg-accent px-6 py-3 text-sm text-white transition hover:opacity-90"

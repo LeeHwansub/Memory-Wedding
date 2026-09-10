@@ -1,7 +1,7 @@
 # 청첩장(Invitation) 기능 설명
 
 > 브랜치: `feat/invitation`  
-> 상태: 구현 완료, commit/push 대기 (사용자 허락 필요)
+> 상태: `dev`에 merge 완료 (`feat/invitation`)
 
 ## 1. 개요
 
@@ -20,7 +20,7 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
         ▼
 하객 /w/{slug}
   공개 + 링크 활성일 때만 조회
-  (업로드/방명록 CTA는 다음 단계에서 연결)
+  (업로드 CTA는 다음 단계에서 연결)
 ```
 
 ## 3. Backend API
@@ -69,6 +69,5 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
 
 ## 6. 다음 확장
 
-- `/w/[slug]/upload` 실제 업로드
-- `/w/[slug]/guestbook` 방명록
+- `/w/[slug]/upload` 실제 업로드 + Google Drive
 - 갤러리 섹션 JSON

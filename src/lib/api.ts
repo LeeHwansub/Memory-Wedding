@@ -44,9 +44,16 @@ export async function apiFetch<T>(
   return response.json();
 }
 
-export async function apiPublicFetch<T>(path: string): Promise<ApiResponse<T>> {
+export async function apiPublicFetch<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<ApiResponse<T>> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 
   if (!response.ok) {
