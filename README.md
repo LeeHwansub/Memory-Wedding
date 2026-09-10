@@ -39,6 +39,8 @@ Google / Naver / Kakao Developer Console에서 Redirect URI 등록:
 | Naver | `http://localhost:8080/login/oauth2/code/naver` |
 | Kakao | `http://localhost:8080/login/oauth2/code/kakao` |
 
+Kakao 동의항목은 **닉네임만** 사용합니다. (이메일 미요청, `kakao_{id}@kakao.local`로 저장)
+
 `.env` 파일에 Client ID/Secret 입력 후 `docker compose up -d --build` 재실행.
 
 ### Docker 명령어
