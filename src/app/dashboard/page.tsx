@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
+import type { WeddingProject } from "@/types";
 
 type Member = {
   id: number;
@@ -17,6 +18,7 @@ type Member = {
 export default function DashboardPage() {
   const router = useRouter();
   const [member, setMember] = useState<Member | null>(null);
+  const [projects, setProjects] = useState<WeddingProject[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,8 +27,14 @@ export default function DashboardPage() {
       return;
     }
 
-    apiFetch<Member>("/api/members/me")
-      .then((res) => setMember(res.data))
+    Promise.all([
+      apiFetch<Member>("/api/members/me"),
+      apiFetch<WeddingProject[]>("/api/projects"),
+    ])
+      .then(([memberRes, projectRes]) => {
+        setMember(memberRes.data);
+        setProjects(projectRes.data ?? []);
+      })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
   }, [router]);
@@ -46,48 +54,73 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <p className="mb-2 text-sm tracking-[0.3em] text-muted uppercase">
-        Dashboard
-      </p>
-      <h1
-        className="mb-8 text-4xl font-light"
-        style={{ fontFamily: "var(--font-playfair), serif" }}
-      >
-        안녕하세요, {member?.displayName}님
-      </h1>
-
-      <div className="mb-8 rounded-2xl border border-accent/20 bg-white/60 p-6">
-        <dl className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted">이메일</dt>
-            <dd>{member?.email}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">연결된 OAuth</dt>
-            <dd>{member?.providers.join(", ")}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">Role</dt>
-            <dd>{member?.role}</dd>
-          </div>
-        </dl>
-      </div>
-
-      <div className="flex gap-4">
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-2 text-sm tracking-[0.3em] text-muted uppercase">
+            Dashboard
+          </p>
+          <h1
+            className="text-4xl font-light"
+            style={{ fontFamily: "var(--font-playfair), serif" }}
+          >
+            안녕하세요, {member?.displayName}님
+          </h1>
+        </div>
         <button
           type="button"
           onClick={handleLogout}
-          className="rounded-full border border-accent/40 px-6 py-2 text-sm transition hover:bg-accent-soft"
+          className="rounded-full border border-accent/40 px-4 py-2 text-sm transition hover:bg-accent-soft"
         >
           로그아웃
         </button>
-        <Link
-          href="/"
-          className="rounded-full bg-accent px-6 py-2 text-sm text-white transition hover:opacity-90"
-        >
-          홈으로
-        </Link>
       </div>
+
+      <section className="mb-10">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-medium">Wedding Project</h2>
+          {projects.length === 0 && (
+            <Link
+              href="/dashboard/projects/new"
+              className="rounded-full bg-accent px-5 py-2 text-sm text-white transition hover:opacity-90"
+            >
+              Project 만들기
+            </Link>
+          )}
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-accent/30 bg-white/50 p-10 text-center">
+            <p className="mb-2 text-muted">아직 등록된 결혼식이 없습니다.</p>
+            <p className="text-sm text-muted">첫 Wedding Project를 만들어 보세요.</p>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {projects.map((project) => (
+              <li key={project.id}>
+                <Link
+                  href={`/dashboard/projects/${project.id}`}
+                  className="block rounded-2xl border border-accent/20 bg-white/70 p-5 transition hover:border-accent/40"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <p className="text-lg font-medium">
+                      {project.groomName} ♥ {project.brideName}
+                    </p>
+                    <span className="text-xs tracking-wide text-muted uppercase">
+                      {project.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted">
+                    {new Date(project.weddingAt).toLocaleString("ko-KR")}
+                    {project.venueName ? ` · ${project.venueName}` : ""}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <p className="text-xs text-muted">MVP: 회원당 Project 1개까지 생성 가능</p>
     </main>
   );
 }
