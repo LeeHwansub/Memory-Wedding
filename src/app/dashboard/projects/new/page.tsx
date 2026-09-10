@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { AddressSearchField } from "@/components/ui/AddressSearchField";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import type { WeddingProject } from "@/types";
@@ -78,7 +79,15 @@ export default function NewProjectPage() {
           />
         </label>
         <Field label="예식장명" value={venueName} onChange={setVenueName} />
-        <Field label="예식장 주소" value={venueAddress} onChange={setVenueAddress} />
+        <AddressSearchField
+          value={venueAddress}
+          onChange={setVenueAddress}
+          onBuildingName={(buildingName) => {
+            if (!venueName.trim()) {
+              setVenueName(buildingName);
+            }
+          }}
+        />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
