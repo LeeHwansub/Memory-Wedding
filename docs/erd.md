@@ -201,7 +201,7 @@ erDiagram
 |------|------|------|-----|------|
 | id | BIGINT | NO | PK | Auto Increment |
 | member_id | BIGINT | NO | FK → member.id | 회원 |
-| provider | ENUM('GOOGLE','NAVER') | NO | | OAuth 제공자 |
+| provider | ENUM('GOOGLE','NAVER','KAKAO') | NO | | OAuth 제공자 |
 | provider_user_id | VARCHAR(255) | NO | | 제공자 사용자 ID |
 | created_at | DATETIME | NO | | 생성일 |
 

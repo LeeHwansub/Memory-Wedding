@@ -87,7 +87,7 @@ Memory Wedding
 | ID | 화면명 | 경로 | 설명 | 연관 FR |
 |----|--------|------|------|---------|
 | UI-PUB-001 | 랜딩 | `/` | 서비스 소개, 로그인 CTA | - |
-| UI-PUB-002 | 로그인 | `/login` | Google / Naver OAuth 버튼 | FR-MEM-001, 002 |
+| UI-PUB-002 | 로그인 | `/login` | Google / Naver / Kakao OAuth 버튼 | FR-MEM-001, 002 |
 
 ### 3.2 신랑·신부 (USER)
 

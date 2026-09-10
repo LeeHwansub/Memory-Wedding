@@ -31,6 +31,12 @@ export default function LoginPage() {
           >
             Naver로 계속하기
           </a>
+          <a
+            href={getOAuthLoginUrl("kakao")}
+            className="rounded-full bg-[#FEE500] px-6 py-3 text-sm font-medium text-[#191919] transition hover:opacity-90"
+          >
+            Kakao로 계속하기
+          </a>
         </div>
 
         <Link

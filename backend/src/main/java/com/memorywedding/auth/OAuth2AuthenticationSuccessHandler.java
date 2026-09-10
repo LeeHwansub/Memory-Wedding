@@ -45,11 +45,24 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (email != null) {
             return email.toString();
         }
+
         @SuppressWarnings("unchecked")
         var response = (java.util.Map<String, Object>) user.getAttribute("response");
         if (response != null && response.get("email") != null) {
             return response.get("email").toString();
         }
+
+        @SuppressWarnings("unchecked")
+        var kakaoAccount = (java.util.Map<String, Object>) user.getAttribute("kakao_account");
+        if (kakaoAccount != null && kakaoAccount.get("email") != null) {
+            return kakaoAccount.get("email").toString();
+        }
+
+        Object kakaoId = user.getAttribute("id");
+        if (kakaoId != null) {
+            return "kakao_" + kakaoId + "@kakao.local";
+        }
+
         return "";
     }
 }

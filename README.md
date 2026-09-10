@@ -26,17 +26,18 @@ docker compose up -d --build
 # 3. 확인
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:8080/api/health
-# MySQL:    localhost:3306
+# MySQL:    localhost:3307
 ```
 
 ### OAuth 설정
 
-Google / Naver Developer Console에서 Redirect URI 등록:
+Google / Naver / Kakao Developer Console에서 Redirect URI 등록:
 
 | Provider | Redirect URI |
 |----------|--------------|
 | Google | `http://localhost:8080/login/oauth2/code/google` |
 | Naver | `http://localhost:8080/login/oauth2/code/naver` |
+| Kakao | `http://localhost:8080/login/oauth2/code/kakao` |
 
 `.env` 파일에 Client ID/Secret 입력 후 `docker compose up -d --build` 재실행.
 
@@ -87,7 +88,7 @@ cd backend
 
 | Method | Path | 설명 |
 |--------|------|------|
-| GET | `/oauth2/authorization/{google\|naver}` | OAuth 로그인 |
+| GET | `/oauth2/authorization/{google\|naver\|kakao}` | OAuth 로그인 |
 | GET | `/api/members/me` | 내 프로필 조회 |
 | PATCH | `/api/members/me` | 프로필 수정 |
 | DELETE | `/api/members/me` | 회원 탈퇴 |

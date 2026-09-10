@@ -13,7 +13,7 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export function getOAuthLoginUrl(provider: "google" | "naver"): string {
+export function getOAuthLoginUrl(provider: "google" | "naver" | "kakao"): string {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
   return `${apiUrl}/oauth2/authorization/${provider}`;
 }

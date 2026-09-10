@@ -26,10 +26,29 @@ public record OAuthAttributes(
                 Map<String, Object> response = (Map<String, Object>) attributes.get("response");
                 yield new OAuthAttributes(
                         provider,
-                        (String) response.get("id"),
+                        String.valueOf(response.get("id")),
                         (String) response.get("email"),
                         (String) response.get("name")
                 );
+            }
+            case KAKAO -> {
+                String providerUserId = String.valueOf(attributes.get("id"));
+                @SuppressWarnings("unchecked")
+                Map<String, Object> account = (Map<String, Object>) attributes.get("kakao_account");
+                String email = null;
+                String nickname = null;
+                if (account != null) {
+                    email = (String) account.get("email");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> profile = (Map<String, Object>) account.get("profile");
+                    if (profile != null) {
+                        nickname = (String) profile.get("nickname");
+                    }
+                }
+                if (email == null || email.isBlank()) {
+                    email = "kakao_" + providerUserId + "@kakao.local";
+                }
+                yield new OAuthAttributes(provider, providerUserId, email, nickname);
             }
         };
     }
@@ -37,7 +56,7 @@ public record OAuthAttributes(
     public Member toMember() {
         return Member.builder()
                 .email(email)
-                .displayName(displayName != null ? displayName : email)
+                .displayName(displayName != null && !displayName.isBlank() ? displayName : email)
                 .role(MemberRole.USER)
                 .build();
     }

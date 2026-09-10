@@ -67,6 +67,7 @@ Memory-Wedding/
 |--------|-----------|------|-----|
 | Google OAuth 2.0 | OAuth 2.0 | 로그인 | ✅ |
 | Naver OAuth 2.0 | OAuth 2.0 | 로그인 | ✅ |
+| Kakao OAuth 2.0 | OAuth 2.0 | 로그인 | ✅ |
 | Google Drive API | v3 | 파일 저장 | ✅ |
 | Gemini API | 2.x | AI 분석 | ❌ |
 | FFmpeg | 7.x | 영상 합성 | ❌ |
@@ -103,7 +104,7 @@ docker compose up -d --build   # 전체 스택 실행
 |--------|------|
 | Next.js | 3000 |
 | Spring Boot | 8080 |
-| MySQL | 3306 |
+| MySQL | 3307 (호스트) / 3306 (컨테이너) |
 
 ---
 
