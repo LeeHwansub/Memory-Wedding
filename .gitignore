@@ -34,6 +34,10 @@ yarn-error.log*
 .env*.local
 .env
 
+# upload originals / secrets
+/data/
+/secrets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

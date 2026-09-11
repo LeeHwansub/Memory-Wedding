@@ -69,5 +69,6 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
 
 ## 6. 다음 확장
 
-- `/w/[slug]/upload` 실제 업로드 + Google Drive
+- `/w/[slug]/upload` → `feat/guest-upload` (GCS/로컬 원본)
+- Google Drive 사본 전달
 - 갤러리 섹션 JSON

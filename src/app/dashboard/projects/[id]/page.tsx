@@ -78,6 +78,7 @@ export default function ProjectDetailPage() {
         <NavCard href={`/dashboard/projects/${project.id}/edit`} title="기본 정보 수정" />
         <NavCard href={`/dashboard/projects/${project.id}/invitation`} title="청첩장 편집" />
         <NavCard href={`/dashboard/projects/${project.id}/guestbook`} title="방명록 관리" />
+        <NavCard href={`/dashboard/projects/${project.id}/gallery`} title="업로드 갤러리" />
         <NavCard href={`/dashboard/projects/${project.id}/share`} title="하객 초대 / QR" />
         <NavCard href={`/w/${project.slug}`} title="청첩장 미리보기" />
       </div>
