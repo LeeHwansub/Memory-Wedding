@@ -7,7 +7,7 @@ import { useProjectPreview } from "@/components/shell/ProjectShell";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { formatWeddingDateTime } from "@/lib/datetime";
-import { PROJECT_NAV } from "@/lib/project-nav";
+import { isProjectNavActive, PROJECT_NAV } from "@/lib/project-nav";
 import type { WeddingProject } from "@/types";
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -26,6 +26,14 @@ const ICONS: Record<string, React.ReactNode> = {
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="m3 7 9 6 9-6" />
+    </svg>
+  ),
+  design: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m21 15-4.5-4.5L8 19" />
+      <path d="M14 8h4M14 11h2" />
     </svg>
   ),
   guestbook: (
@@ -131,7 +139,7 @@ export default function ProjectDetailPage() {
             );
           }
           const href = item.href?.(String(project.id)) ?? "#";
-          const active = pathname.startsWith(href);
+          const active = isProjectNavActive(item, pathname, String(project.id));
           return (
             <TileLink
               key={item.key}

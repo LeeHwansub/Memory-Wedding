@@ -97,6 +97,45 @@ export async function apiPublicUpload<T>(
   return response.json();
 }
 
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+): Promise<ApiResponse<T>> {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (response.status === 401) {
+    clearToken();
+    throw new Error("Unauthorized");
+  }
+
+  if (!response.ok) {
+    let message = `API error: ${response.status}`;
+    try {
+      const body = (await response.json()) as ApiResponse<unknown>;
+      if (body.message) {
+        message = body.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export function apiAssetUrl(path: string): string {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  return `${API_BASE_URL}${path}`;
+}
+
 export async function apiFetchBlob(path: string): Promise<Blob> {
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {

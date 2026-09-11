@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GuestbookCarousel } from "@/components/guestbook/GuestbookCarousel";
+import { GalleryCard } from "@/components/invitation/GalleryCard";
+import { MainPhotoHero } from "@/components/invitation/MainPhotoHero";
 import { KakaoMap } from "@/components/ui/KakaoMap";
 import { PreviewChrome } from "@/components/ui/PreviewChrome";
 import { apiPublicFetch } from "@/lib/api";
@@ -91,6 +93,12 @@ export default function PublicInvitationPage() {
     });
   })();
 
+  const hasTopMain =
+    Boolean(data.mainPhoto) && data.mainPhotoPlacement === "TOP";
+  const hasMiddleMain =
+    Boolean(data.mainPhoto) && data.mainPhotoPlacement === "MIDDLE";
+  const gallery = data.gallery ?? [];
+
   return (
     <main className="min-h-screen bg-[#FAF8F5] text-[#2C2420]">
       {showPreviewChrome && (
@@ -102,24 +110,46 @@ export default function PublicInvitationPage() {
           }
         />
       )}
+
+      {hasTopMain && data.mainPhoto && (
+        <MainPhotoHero
+          photo={data.mainPhoto}
+          placement="TOP"
+          size={data.mainPhotoSize ?? "LG"}
+          brightness={data.mainBrightness ?? 1}
+          saturation={data.mainSaturation ?? 1}
+          focalX={data.mainFocalX ?? 50}
+          focalY={data.mainFocalY ?? 50}
+          groomName={data.groomName}
+          brideName={data.brideName}
+          title={data.title}
+        />
+      )}
+
       <section className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-16 text-center">
-        <p className="mb-4 text-[11px] tracking-[0.32em] text-[#8A7F78] uppercase">
-          Wedding Invitation
-        </p>
-        <h1
-          className="mb-3 text-[2.35rem] font-light leading-tight tracking-wide"
-          style={{ fontFamily: "var(--font-playfair), serif" }}
-        >
-          {data.groomName}
-          <span className="mx-3 inline-block text-lg text-[#C9A87C]" aria-hidden>
-            &
-          </span>
-          {data.brideName}
-        </h1>
-        {data.title && (
-          <p className="mb-12 text-sm tracking-wide text-[#C9A87C]">{data.title}</p>
+        {!hasTopMain && (
+          <>
+            <p className="mb-4 text-[11px] tracking-[0.32em] text-[#8A7F78] uppercase">
+              Wedding Invitation
+            </p>
+            <h1
+              className="mb-3 text-[2.35rem] font-light leading-tight tracking-wide"
+              style={{ fontFamily: "var(--font-playfair), serif" }}
+            >
+              {data.groomName}
+              <span className="mx-3 inline-block text-lg text-[#C9A87C]" aria-hidden>
+                &
+              </span>
+              {data.brideName}
+            </h1>
+            {data.title && (
+              <p className="mb-12 text-sm tracking-wide text-[#C9A87C]">{data.title}</p>
+            )}
+            {!data.title && <div className="mb-12" />}
+          </>
         )}
-        {!data.title && <div className="mb-12" />}
+
+        {hasTopMain && <div className="mb-8" />}
 
         <div className="mb-14 space-y-1.5">
           <p className="text-[13px] tracking-[0.12em] text-[#8A7F78]">
@@ -140,12 +170,41 @@ export default function PublicInvitationPage() {
           )}
         </div>
 
+        {hasMiddleMain && data.mainPhoto && (
+          <div className="mb-16 -mx-6">
+            <MainPhotoHero
+              photo={data.mainPhoto}
+              placement="MIDDLE"
+              size={data.mainPhotoSize ?? "LG"}
+              brightness={data.mainBrightness ?? 1}
+              saturation={data.mainSaturation ?? 1}
+              focalX={data.mainFocalX ?? 50}
+              focalY={data.mainFocalY ?? 50}
+              groomName={data.groomName}
+              brideName={data.brideName}
+              title={data.title}
+            />
+          </div>
+        )}
+
         {data.greetingMessage && (
           <div className="mb-16">
             <SectionLabel>Greeting</SectionLabel>
             <p className="mx-auto max-w-sm whitespace-pre-wrap text-center text-[15px] leading-[1.9] tracking-wide text-[#2C2420]/90">
               {data.greetingMessage}
             </p>
+          </div>
+        )}
+
+        {gallery.length > 0 && (
+          <div className="mb-16">
+            <SectionLabel>Gallery</SectionLabel>
+            <GalleryCard
+              layout={data.galleryLayout ?? "SLIDER"}
+              columns={data.galleryColumns ?? 2}
+              imageSize={data.galleryImageSize ?? "MD"}
+              items={gallery}
+            />
           </div>
         )}
 

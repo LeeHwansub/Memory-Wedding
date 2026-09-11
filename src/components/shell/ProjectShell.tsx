@@ -12,7 +12,7 @@ import {
 } from "react";
 import { InvitationPreviewModal } from "@/components/preview/InvitationPreviewModal";
 import { apiFetch } from "@/lib/api";
-import { PROJECT_NAV } from "@/lib/project-nav";
+import { isProjectNavActive, PROJECT_NAV } from "@/lib/project-nav";
 import type { WeddingProject } from "@/types";
 
 type PreviewContextValue = {
@@ -80,12 +80,7 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
 
           <nav className="hidden items-center gap-1 lg:flex">
             {PROJECT_NAV.map((item) => {
-              const active =
-                item.key === "home"
-                  ? pathname === `/dashboard/projects/${projectId}`
-                  : item.href
-                    ? pathname.startsWith(item.href(projectId))
-                    : false;
+              const active = isProjectNavActive(item, pathname, projectId);
               if (item.action === "preview") {
                 return (
                   <button
@@ -146,10 +141,7 @@ export function ProjectShell({ children }: { children: React.ReactNode }) {
                   );
                 }
                 const href = item.href?.(projectId) ?? "#";
-                const active =
-                  item.key === "home"
-                    ? pathname === `/dashboard/projects/${projectId}`
-                    : pathname.startsWith(href);
+                const active = isProjectNavActive(item, pathname, projectId);
                 return (
                   <Link
                     key={item.key}
