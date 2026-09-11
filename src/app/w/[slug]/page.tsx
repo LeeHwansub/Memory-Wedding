@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GuestbookCarousel } from "@/components/guestbook/GuestbookCarousel";
 import { KakaoMap } from "@/components/ui/KakaoMap";
+import { PreviewChrome } from "@/components/ui/PreviewChrome";
 import { apiPublicFetch } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { toDatetimeLocalValue } from "@/lib/datetime";
 import type { PublicInvitation } from "@/types/invitation";
 
@@ -25,11 +27,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function PublicInvitationPage() {
   const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<PublicInvitation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPreviewChrome, setShowPreviewChrome] = useState(false);
+  const fromProjectId = searchParams.get("from");
 
   useEffect(() => {
+    setShowPreviewChrome(Boolean(getToken()));
     apiPublicFetch<PublicInvitation>(`/api/public/w/${params.slug}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err instanceof Error ? err.message : "불러오기 실패"))
@@ -86,6 +92,15 @@ export default function PublicInvitationPage() {
 
   return (
     <main className="min-h-screen bg-[#FAF8F5] text-[#2C2420]">
+      {showPreviewChrome && (
+        <PreviewChrome
+          projectHref={
+            fromProjectId
+              ? `/dashboard/projects/${fromProjectId}`
+              : "/dashboard"
+          }
+        />
+      )}
       <section className="mx-auto flex min-h-screen max-w-lg flex-col px-6 py-16 text-center">
         <p className="mb-4 text-[11px] tracking-[0.32em] text-[#8A7F78] uppercase">
           Wedding Invitation

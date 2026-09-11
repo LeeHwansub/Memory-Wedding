@@ -1,26 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AddressSearchField } from "@/components/ui/AddressSearchField";
+import { StatusModal } from "@/components/ui/StatusModal";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { toApiLocalDateTime, toDatetimeLocalValue } from "@/lib/datetime";
 import type { ProjectStatus, WeddingProject } from "@/types";
 
+type ProjectDriveStatus = {
+  driveConnected: boolean;
+  googleAccountEmail: string | null;
+  pendingSyncCount: number;
+  syncedCount: number;
+};
+
+type DriveModal =
+  | null
+  | { kind: "progress"; step: number; title: string; description?: string }
+  | { kind: "done"; title: string; description: string };
+
+const CONNECT_STEPS = [
+  "연결 요청 준비",
+  "Google 인증으로 이동",
+  "권한 확인 및 저장",
+];
+
 export default function EditProjectPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [groomName, setGroomName] = useState("");
   const [brideName, setBrideName] = useState("");
   const [weddingAt, setWeddingAt] = useState("");
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("DRAFT");
+  const [drive, setDrive] = useState<ProjectDriveStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [modal, setModal] = useState<DriveModal>(null);
+
+  const loadDrive = useCallback(async () => {
+    const res = await apiFetch<ProjectDriveStatus>(`/api/projects/${params.id}/drive`);
+    setDrive(res.data);
+  }, [params.id]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -28,9 +56,25 @@ export default function EditProjectPage() {
       return;
     }
 
-    apiFetch<WeddingProject>(`/api/projects/${params.id}`)
-      .then((res) => {
-        const project = res.data;
+    const driveFlag = searchParams.get("drive");
+    if (driveFlag === "connected") {
+      setModal({
+        kind: "done",
+        title: "Drive 연동 완료",
+        description: "Google Drive 연결이 완료되었습니다. 업로드 갤러리에서 파일을 동기화할 수 있습니다.",
+      });
+    } else if (driveFlag === "missing_refresh_token") {
+      setError("Drive 권한 토큰을 받지 못했습니다. 다시 연결해 주세요.");
+    } else if (driveFlag === "invalid_state") {
+      setError("인증 상태가 만료되었습니다. 다시 연결해 주세요.");
+    }
+
+    Promise.all([
+      apiFetch<WeddingProject>(`/api/projects/${params.id}`),
+      apiFetch<ProjectDriveStatus>(`/api/projects/${params.id}/drive`),
+    ])
+      .then(([projectRes, driveRes]) => {
+        const project = projectRes.data;
         if (!project) return;
         setGroomName(project.groomName);
         setBrideName(project.brideName);
@@ -38,10 +82,11 @@ export default function EditProjectPage() {
         setVenueName(project.venueName ?? "");
         setVenueAddress(project.venueAddress ?? "");
         setStatus(project.status);
+        setDrive(driveRes.data);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "조회 실패"))
       .finally(() => setLoading(false));
-  }, [params.id, router]);
+  }, [params.id, router, searchParams]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -68,6 +113,65 @@ export default function EditProjectPage() {
     }
   }
 
+  async function handleDriveConnect() {
+    setDriveBusy(true);
+    setError(null);
+    setModal({
+      kind: "progress",
+      step: 0,
+      title: "Google Drive 연동",
+      description: "연결을 준비하고 있습니다.",
+    });
+    try {
+      const res = await apiFetch<{ authorizationUrl: string }>(
+        `/api/drive/connect-url?projectId=${params.id}`,
+      );
+      const url = res.data?.authorizationUrl;
+      if (!url) throw new Error("연결 URL이 비어 있습니다.");
+      setModal({
+        kind: "progress",
+        step: 1,
+        title: "Google Drive 연동",
+        description: "Google 인증 화면으로 이동합니다. 잠시만 기다려 주세요.",
+      });
+      window.setTimeout(() => {
+        window.location.href = url;
+      }, 450);
+    } catch (err) {
+      setModal(null);
+      setError(err instanceof Error ? err.message : "Drive 연결 실패");
+      setDriveBusy(false);
+    }
+  }
+
+  async function handleDriveDisconnect() {
+    if (!confirm("Google Drive 연결을 해제할까요? (Drive에 올린 파일은 그대로 둡니다)")) {
+      return;
+    }
+    setDriveBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/api/drive/disconnect", { method: "DELETE" });
+      setModal({
+        kind: "done",
+        title: "연결 해제 완료",
+        description: "Google Drive 연결이 해제되었습니다.",
+      });
+      await loadDrive();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "연결 해제 실패");
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  function closeDoneModal() {
+    setModal(null);
+    if (searchParams.get("drive")) {
+      router.replace(`/dashboard/projects/${params.id}/edit`);
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -75,6 +179,12 @@ export default function EditProjectPage() {
       </main>
     );
   }
+
+  const driveLabel = !drive?.driveConnected
+    ? "미연결"
+    : drive.googleAccountEmail
+      ? `연결됨 · ${drive.googleAccountEmail}`
+      : "연결됨";
 
   return (
     <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
@@ -127,6 +237,37 @@ export default function EditProjectPage() {
           </select>
         </label>
 
+        <section className="rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Google Drive</p>
+              <p className="mt-1 text-xs text-muted">{driveLabel}</p>
+              <p className="mt-1 text-xs text-muted">
+                원본은 우리 저장소에 두고, Drive에는 사본만 전달합니다.
+              </p>
+            </div>
+            {!drive?.driveConnected ? (
+              <button
+                type="button"
+                disabled={driveBusy}
+                onClick={handleDriveConnect}
+                className="shrink-0 rounded-full border border-accent/30 px-4 py-1.5 text-xs disabled:opacity-50"
+              >
+                연결
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={driveBusy}
+                onClick={handleDriveDisconnect}
+                className="shrink-0 rounded-full border border-red-200 px-4 py-1.5 text-xs text-red-600 disabled:opacity-50"
+              >
+                해제
+              </button>
+            )}
+          </div>
+        </section>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button
@@ -137,6 +278,22 @@ export default function EditProjectPage() {
           {submitting ? "저장 중..." : "저장하기"}
         </button>
       </form>
+
+      <StatusModal
+        open={modal?.kind === "progress"}
+        title={modal?.kind === "progress" ? modal.title : ""}
+        description={modal?.kind === "progress" ? modal.description : undefined}
+        steps={CONNECT_STEPS}
+        activeStep={modal?.kind === "progress" ? modal.step : 0}
+      />
+      <StatusModal
+        open={modal?.kind === "done"}
+        title={modal?.kind === "done" ? modal.title : ""}
+        description={modal?.kind === "done" ? modal.description : undefined}
+        steps={CONNECT_STEPS}
+        done
+        onConfirm={closeDoneModal}
+      />
     </main>
   );
 }

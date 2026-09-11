@@ -104,4 +104,8 @@ public class WeddingProject extends BaseTimeEntity {
     public boolean isDeleted() {
         return deletedAt != null;
     }
+
+    public void assignDriveRootFolderId(String driveRootFolderId) {
+        this.driveRootFolderId = driveRootFolderId;
+    }
 }

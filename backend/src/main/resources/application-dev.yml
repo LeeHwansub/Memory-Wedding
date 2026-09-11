@@ -60,6 +60,9 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-in-production-use-long-random-string-at-least-32-chars}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  drive:
+    redirect-uri: ${DRIVE_REDIRECT_URI:http://localhost:8080/api/drive/oauth/callback}
   storage:
     type: ${STORAGE_TYPE:local}
     local-path: ${STORAGE_LOCAL_PATH:./data/uploads}
