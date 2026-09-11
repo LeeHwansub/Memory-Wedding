@@ -47,6 +47,10 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+  servlet:
+    multipart:
+      max-file-size: 300MB
+      max-request-size: 310MB
 
 app:
   cors:
@@ -54,3 +58,9 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
   jwt:
     secret: ${JWT_SECRET}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local-path: ${STORAGE_LOCAL_PATH:/app/data/uploads}
+    gcs:
+      bucket: ${GCS_BUCKET:}
+      credentials-path: ${GCS_CREDENTIALS_PATH:}

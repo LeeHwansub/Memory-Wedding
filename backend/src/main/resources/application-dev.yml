@@ -12,6 +12,10 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+  servlet:
+    multipart:
+      max-file-size: 300MB
+      max-request-size: 310MB
   security:
     oauth2:
       client:
@@ -56,3 +60,9 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-in-production-use-long-random-string-at-least-32-chars}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local-path: ${STORAGE_LOCAL_PATH:./data/uploads}
+    gcs:
+      bucket: ${GCS_BUCKET:}
+      credentials-path: ${GCS_CREDENTIALS_PATH:}
