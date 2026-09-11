@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { InvitationDesignPreview } from "@/components/invitation/InvitationDesignPreview";
 import { InvitationImage } from "@/components/invitation/InvitationImage";
 import { apiFetch, apiUpload } from "@/lib/api";
@@ -28,6 +28,8 @@ const SIZES: { value: MediaDisplaySize; label: string }[] = [
   { value: "FULL", label: "최대" },
 ];
 
+type MobilePane = "edit" | "preview";
+
 export default function InvitationDesignPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -44,25 +46,54 @@ export default function InvitationDesignPage() {
   const [mainFocalY, setMainFocalY] = useState(50);
   const [mainPhoto, setMainPhoto] = useState<InvitationMedia | null>(null);
   const [gallery, setGallery] = useState<InvitationMedia[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"MAIN" | "GALLERY" | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<MobilePane>("edit");
+
+  function settingsSnapshot(data: {
+    galleryLayout: GalleryLayout;
+    galleryColumns: number;
+    galleryImageSize: MediaDisplaySize;
+    mainPhotoSize: MediaDisplaySize;
+    mainPhotoPlacement: MainPhotoPlacement;
+    mainBrightness: number;
+    mainSaturation: number;
+    mainFocalX: number;
+    mainFocalY: number;
+  }) {
+    return JSON.stringify(data);
+  }
 
   function applyInvitation(data: Invitation) {
+    const next = {
+      galleryLayout: data.galleryLayout ?? "SLIDER",
+      galleryColumns: data.galleryColumns ?? 2,
+      galleryImageSize: data.galleryImageSize ?? "MD",
+      mainPhotoSize: data.mainPhotoSize ?? "LG",
+      mainPhotoPlacement: data.mainPhotoPlacement ?? "TOP",
+      mainBrightness: data.mainBrightness ?? 1,
+      mainSaturation: data.mainSaturation ?? 1,
+      mainFocalX: data.mainFocalX ?? 50,
+      mainFocalY: data.mainFocalY ?? 50,
+    };
     setInvitation(data);
-    setGalleryLayout(data.galleryLayout ?? "SLIDER");
-    setGalleryColumns(data.galleryColumns ?? 2);
-    setGalleryImageSize(data.galleryImageSize ?? "MD");
-    setMainPhotoSize(data.mainPhotoSize ?? "LG");
-    setMainPhotoPlacement(data.mainPhotoPlacement ?? "TOP");
-    setMainBrightness(data.mainBrightness ?? 1);
-    setMainSaturation(data.mainSaturation ?? 1);
-    setMainFocalX(data.mainFocalX ?? 50);
-    setMainFocalY(data.mainFocalY ?? 50);
+    setGalleryLayout(next.galleryLayout);
+    setGalleryColumns(next.galleryColumns);
+    setGalleryImageSize(next.galleryImageSize);
+    setMainPhotoSize(next.mainPhotoSize);
+    setMainPhotoPlacement(next.mainPhotoPlacement);
+    setMainBrightness(next.mainBrightness);
+    setMainSaturation(next.mainSaturation);
+    setMainFocalX(next.mainFocalX);
+    setMainFocalY(next.mainFocalY);
     setMainPhoto(data.mainPhoto ?? null);
     setGallery(data.gallery ?? []);
+    setSavedSnapshot(settingsSnapshot(next));
   }
 
   useEffect(() => {
@@ -79,8 +110,36 @@ export default function InvitationDesignPage() {
       .finally(() => setLoading(false));
   }, [params.id, router]);
 
-  async function handleSave(event: FormEvent) {
-    event.preventDefault();
+  const dirty = useMemo(() => {
+    if (!savedSnapshot) return false;
+    return (
+      settingsSnapshot({
+        galleryLayout,
+        galleryColumns,
+        galleryImageSize,
+        mainPhotoSize,
+        mainPhotoPlacement,
+        mainBrightness,
+        mainSaturation,
+        mainFocalX,
+        mainFocalY,
+      }) !== savedSnapshot
+    );
+  }, [
+    savedSnapshot,
+    galleryLayout,
+    galleryColumns,
+    galleryImageSize,
+    mainPhotoSize,
+    mainPhotoPlacement,
+    mainBrightness,
+    mainSaturation,
+    mainFocalX,
+    mainFocalY,
+  ]);
+
+  async function handleSave(event?: FormEvent) {
+    event?.preventDefault();
     if (!invitation) return;
     setSaving(true);
     setError(null);
@@ -112,26 +171,57 @@ export default function InvitationDesignPage() {
     }
   }
 
-  async function uploadMedia(type: "MAIN" | "GALLERY", file: File | null) {
-    if (!file) return;
+  async function uploadOne(type: "MAIN" | "GALLERY", file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await apiUpload<InvitationMedia>(
+      `/api/projects/${params.id}/invitation/media?type=${type}`,
+      formData,
+    );
+    return res.data;
+  }
+
+  async function uploadMedia(type: "MAIN" | "GALLERY", files: FileList | File[] | null) {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
     setUploading(type);
     setError(null);
     setMessage(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await apiUpload<InvitationMedia>(
-        `/api/projects/${params.id}/invitation/media?type=${type}`,
-        formData,
+      if (type === "MAIN") {
+        const data = await uploadOne("MAIN", list[0]);
+        if (data) setMainPhoto(data);
+        setMessage("메인 사진이 업로드되었습니다.");
+        return;
+      }
+
+      const remaining = Math.max(0, 15 - gallery.length);
+      const batch = list.slice(0, remaining);
+      if (batch.length === 0) {
+        setError("갤러리는 최대 15장까지 등록할 수 있습니다.");
+        return;
+      }
+
+      const uploaded: InvitationMedia[] = [];
+      for (let i = 0; i < batch.length; i += 1) {
+        setUploadProgress(`${i + 1}/${batch.length}`);
+        const data = await uploadOne("GALLERY", batch[i]);
+        if (data) uploaded.push(data);
+      }
+      setGallery((prev) => [...prev, ...uploaded]);
+      setMessage(
+        batch.length === 1
+          ? "갤러리 사진이 추가되었습니다."
+          : `갤러리 사진 ${uploaded.length}장이 추가되었습니다.`,
       );
-      if (!res.data) return;
-      if (type === "MAIN") setMainPhoto(res.data);
-      else setGallery((prev) => [...prev, res.data!]);
-      setMessage(type === "MAIN" ? "메인 사진이 업로드되었습니다." : "갤러리 사진이 추가되었습니다.");
+      if (list.length > remaining) {
+        setError(`최대 15장 제한으로 ${remaining}장만 업로드했습니다.`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "업로드 실패");
     } finally {
       setUploading(null);
+      setUploadProgress(null);
     }
   }
 
@@ -168,6 +258,17 @@ export default function InvitationDesignPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "순서 변경 실패");
     }
+  }
+
+  function setFocalFromClick(
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const x = Math.round(((event.clientX - rect.left) / rect.width) * 100);
+    const y = Math.round(((event.clientY - rect.top) / rect.height) * 100);
+    setMainFocalX(Math.min(100, Math.max(0, x)));
+    setMainFocalY(Math.min(100, Math.max(0, y)));
   }
 
   if (loading) {
@@ -208,51 +309,127 @@ export default function InvitationDesignPage() {
     });
   })();
 
+  const preview = (
+    <InvitationDesignPreview
+      auth
+      groomName={invitation.groomName}
+      brideName={invitation.brideName}
+      title={invitation.title}
+      greetingMessage={invitation.greetingMessage}
+      weddingDateLabel={weddingDateLabel}
+      weddingTimeLabel={weddingTimeLabel}
+      venueName={invitation.venueName}
+      mainPhoto={mainPhoto}
+      mainPhotoPlacement={mainPhotoPlacement}
+      mainPhotoSize={mainPhotoSize}
+      mainBrightness={mainBrightness}
+      mainSaturation={mainSaturation}
+      mainFocalX={mainFocalX}
+      mainFocalY={mainFocalY}
+      gallery={gallery}
+      galleryLayout={galleryLayout}
+      galleryColumns={galleryColumns}
+      galleryImageSize={galleryImageSize}
+    />
+  );
+
   return (
     <main className="mx-auto min-h-[calc(100vh-3.5rem)] max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mb-6">
-        <h1
-          className="text-2xl font-light sm:text-3xl"
-          style={{ fontFamily: "var(--font-playfair), serif" }}
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1
+            className="text-2xl font-light sm:text-3xl"
+            style={{ fontFamily: "var(--font-playfair), serif" }}
+          >
+            청첩장 디자인
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            좌측에서 설정하고 우측(또는 미리보기 탭)에서 바로 확인합니다.
+          </p>
+        </div>
+        {dirty && (
+          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs text-[#8B7355]">
+            저장되지 않은 변경
+          </span>
+        )}
+      </div>
+
+      <div className="mb-5 grid grid-cols-2 gap-1 rounded-full border border-accent/25 bg-white/70 p-1 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobilePane("edit")}
+          className={`rounded-full py-2 text-sm transition ${
+            mobilePane === "edit"
+              ? "bg-foreground text-background"
+              : "text-muted"
+          }`}
         >
-          청첩장 디자인
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          메인 사진·웨딩 갤러리·레이아웃을 설정합니다. 우측에서 바로 확인할 수 있습니다.
-        </p>
+          설정
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePane("preview")}
+          className={`rounded-full py-2 text-sm transition ${
+            mobilePane === "preview"
+              ? "bg-foreground text-background"
+              : "text-muted"
+          }`}
+        >
+          미리보기
+        </button>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_400px]">
-        <form onSubmit={handleSave} className="min-w-0 space-y-8 pb-24 lg:pb-8">
+        <form
+          onSubmit={(e) => void handleSave(e)}
+          className={`min-w-0 space-y-8 pb-28 lg:block lg:pb-8 ${
+            mobilePane === "edit" ? "block" : "hidden"
+          }`}
+        >
           <section className="space-y-4">
             <div>
               <p className="text-sm font-medium">메인 사진</p>
               <p className="mt-1 text-xs text-muted">
-                히어로 사진 1장. 밝기·채도·초점·위치·크기를 조절할 수 있습니다.
+                사진을 클릭해 초점을 지정할 수 있습니다. 밝기·채도·위치·크기도 조절됩니다.
               </p>
             </div>
 
             {mainPhoto ? (
               <div className="space-y-3">
-                <div className="overflow-hidden rounded-xl border border-accent/20">
+                <button
+                  type="button"
+                  onClick={setFocalFromClick}
+                  className="relative block w-full overflow-hidden rounded-xl border border-accent/20"
+                  title="클릭하여 초점 지정"
+                >
                   <InvitationImage
                     auth
                     contentPath={mainPhoto.contentPath}
                     alt="메인 사진"
-                    className="h-40 w-full object-cover"
+                    className="pointer-events-none h-44 w-full object-cover"
                     style={{
                       filter: `brightness(${mainBrightness}) saturate(${mainSaturation})`,
                       objectPosition: `${mainFocalX}% ${mainFocalY}%`,
                     }}
                   />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void deleteMedia(mainPhoto.id, "MAIN")}
-                  className="text-xs text-red-600"
-                >
-                  메인 사진 삭제
+                  <span
+                    className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow"
+                    style={{ left: `${mainFocalX}%`, top: `${mainFocalY}%` }}
+                    aria-hidden
+                  />
                 </button>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-muted">
+                    초점 {mainFocalX}% · {mainFocalY}%
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void deleteMedia(mainPhoto.id, "MAIN")}
+                    className="text-xs text-red-600"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-muted">아직 메인 사진이 없습니다.</p>
@@ -269,7 +446,7 @@ export default function InvitationDesignPage() {
                 accept="image/jpeg,image/png,image/webp"
                 disabled={uploading !== null}
                 onChange={(e) => {
-                  void uploadMedia("MAIN", e.target.files?.[0] ?? null);
+                  void uploadMedia("MAIN", e.target.files);
                   e.target.value = "";
                 }}
                 className="block w-full text-sm"
@@ -334,39 +511,13 @@ export default function InvitationDesignPage() {
                 className="w-full"
               />
             </label>
-            <label className="block text-sm">
-              <span className="mb-1 flex justify-between text-muted">
-                초점 X <span>{mainFocalX}%</span>
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={mainFocalX}
-                onChange={(e) => setMainFocalX(Number(e.target.value))}
-                className="w-full"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 flex justify-between text-muted">
-                초점 Y <span>{mainFocalY}%</span>
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={mainFocalY}
-                onChange={(e) => setMainFocalY(Number(e.target.value))}
-                className="w-full"
-              />
-            </label>
           </section>
 
           <section className="space-y-4">
             <div>
               <p className="text-sm font-medium">웨딩 갤러리</p>
               <p className="mt-1 text-xs text-muted">
-                최대 15장. 공개 청첩장에서는 카드로 보이고, 클릭 시 모달에서 레이아웃대로 열립니다.
+                여러 장을 한 번에 선택할 수 있습니다. 공개 페이지에서는 카드 → 모달로 열립니다.
               </p>
             </div>
 
@@ -423,15 +574,16 @@ export default function InvitationDesignPage() {
             <label className="block">
               <span className="mb-2 block text-xs text-muted">
                 {uploading === "GALLERY"
-                  ? "업로드 중..."
-                  : `갤러리 추가 (${gallery.length}/15)`}
+                  ? `업로드 중... ${uploadProgress ?? ""}`
+                  : `갤러리 추가 (${gallery.length}/15, 다중 선택 가능)`}
               </span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                multiple
                 disabled={uploading !== null || gallery.length >= 15}
                 onChange={(e) => {
-                  void uploadMedia("GALLERY", e.target.files?.[0] ?? null);
+                  void uploadMedia("GALLERY", e.target.files);
                   e.target.value = "";
                 }}
                 className="block w-full text-sm"
@@ -439,45 +591,44 @@ export default function InvitationDesignPage() {
             </label>
 
             {gallery.length > 0 && (
-              <ul className="space-y-2">
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {gallery.map((item, index) => (
                   <li
                     key={item.id}
-                    className="flex items-center gap-3 rounded-xl border border-accent/20 bg-white/80 p-2"
+                    className="overflow-hidden rounded-xl border border-accent/20 bg-white"
                   >
                     <InvitationImage
                       auth
                       contentPath={item.contentPath}
                       alt=""
-                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                      className="aspect-square w-full object-cover"
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs">{item.originalFilename}</p>
-                      <div className="mt-1 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void moveGallery(index, -1)}
-                          disabled={index === 0}
-                          className="text-[11px] text-muted disabled:opacity-40"
-                        >
-                          위로
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void moveGallery(index, 1)}
-                          disabled={index === gallery.length - 1}
-                          className="text-[11px] text-muted disabled:opacity-40"
-                        >
-                          아래로
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteMedia(item.id, "GALLERY")}
-                          className="text-[11px] text-red-600"
-                        >
-                          삭제
-                        </button>
-                      </div>
+                    <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+                      <button
+                        type="button"
+                        onClick={() => void moveGallery(index, -1)}
+                        disabled={index === 0}
+                        className="px-1 text-[11px] text-muted disabled:opacity-30"
+                        aria-label="앞으로"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteMedia(item.id, "GALLERY")}
+                        className="text-[11px] text-red-600"
+                      >
+                        삭제
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void moveGallery(index, 1)}
+                        disabled={index === gallery.length - 1}
+                        className="px-1 text-[11px] text-muted disabled:opacity-30"
+                        aria-label="뒤로"
+                      >
+                        →
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -488,46 +639,60 @@ export default function InvitationDesignPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {message && <p className="text-sm text-green-700">{message}</p>}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-full bg-accent px-6 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-60 lg:sticky lg:bottom-4"
-          >
-            {saving ? "저장 중..." : "디자인 저장"}
-          </button>
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-accent/20 bg-[#FAF8F5]/95 p-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <div className="mx-auto flex max-w-6xl gap-2 lg:block">
+              <button
+                type="button"
+                onClick={() => setMobilePane("preview")}
+                className="flex-1 rounded-full border border-accent/40 px-4 py-3 text-sm lg:hidden"
+              >
+                미리보기
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !dirty}
+                className="flex-[1.4] rounded-full bg-accent px-6 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-50 lg:w-full lg:sticky lg:bottom-4"
+              >
+                {saving ? "저장 중..." : dirty ? "디자인 저장" : "저장됨"}
+              </button>
+            </div>
+          </div>
         </form>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <p className="mb-3 text-center text-xs tracking-wide text-muted">미리보기</p>
+        <aside
+          className={`lg:sticky lg:top-20 lg:block lg:self-start ${
+            mobilePane === "preview" ? "block" : "hidden"
+          }`}
+        >
+          <div className="mb-3 flex items-center justify-between lg:justify-center">
+            <p className="text-xs tracking-wide text-muted">미리보기</p>
+            <button
+              type="button"
+              onClick={() => setMobilePane("edit")}
+              className="text-xs text-accent underline lg:hidden"
+            >
+              설정으로
+            </button>
+          </div>
           <div className="mx-auto w-full max-w-[360px] overflow-hidden rounded-[2rem] border border-black/10 bg-black shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
             <div className="flex items-center justify-center gap-1 border-b border-white/10 bg-[#1c1c1e] px-4 py-2">
               <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
               <span className="h-1 w-12 rounded-full bg-white/20" />
             </div>
-            <div className="h-[min(70vh,680px)] overflow-y-auto overscroll-contain bg-[#FAF8F5]">
-              <InvitationDesignPreview
-                auth
-                groomName={invitation.groomName}
-                brideName={invitation.brideName}
-                title={invitation.title}
-                greetingMessage={invitation.greetingMessage}
-                weddingDateLabel={weddingDateLabel}
-                weddingTimeLabel={weddingTimeLabel}
-                venueName={invitation.venueName}
-                mainPhoto={mainPhoto}
-                mainPhotoPlacement={mainPhotoPlacement}
-                mainPhotoSize={mainPhotoSize}
-                mainBrightness={mainBrightness}
-                mainSaturation={mainSaturation}
-                mainFocalX={mainFocalX}
-                mainFocalY={mainFocalY}
-                gallery={gallery}
-                galleryLayout={galleryLayout}
-                galleryColumns={galleryColumns}
-                galleryImageSize={galleryImageSize}
-              />
+            <div className="h-[min(72vh,700px)] overflow-y-auto overscroll-contain bg-[#FAF8F5]">
+              {preview}
             </div>
           </div>
+          {dirty && (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="mt-4 w-full rounded-full bg-accent px-6 py-3 text-sm text-white lg:hidden"
+            >
+              {saving ? "저장 중..." : "디자인 저장"}
+            </button>
+          )}
         </aside>
       </div>
     </main>
