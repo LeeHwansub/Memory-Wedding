@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { BankPicker } from "@/components/ui/BankPicker";
@@ -151,6 +152,19 @@ export default function InvitationEditPage() {
           미리보기
         </button>
       </p>
+
+      <Link
+        href={`/dashboard/projects/${params.id}/invitation/design`}
+        className="mb-6 flex items-center justify-between rounded-2xl border border-accent/25 bg-white/70 px-4 py-4 transition hover:border-accent/45 hover:bg-white"
+      >
+        <div>
+          <p className="text-sm font-medium">사진 · 디자인</p>
+          <p className="mt-0.5 text-xs text-muted">
+            메인 사진, 웨딩 갤러리, 레이아웃은 디자인 페이지에서 편집합니다.
+          </p>
+        </div>
+        <span className="text-sm text-accent">열기 →</span>
+      </Link>
 
       <div className="mb-6 rounded-2xl border border-accent/20 bg-white/60 p-4 text-sm">
         <p className="mb-1 text-muted">오시는 길 (Project 등록 주소)</p>

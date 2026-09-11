@@ -41,7 +41,8 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
 
 | 경로 | 역할 |
 |------|------|
-| `/dashboard/projects/[id]/invitation` | 편집·공개/비공개 |
+| `/dashboard/projects/[id]/invitation` | 편집·공개/비공개 (텍스트·계좌) |
+| `/dashboard/projects/[id]/invitation/design` | 사진·디자인 (좌 설정 / 우 미리보기) |
 | `/w/[slug]` | 하객용 모바일 청첩장 |
 
 ### 지도
@@ -67,8 +68,7 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
 `Invitation.accountInfo`에 계좌 JSON 저장.  
 `mapUrl`은 Project 주소 기반 카카오맵 URL로 자동 세팅.
 
-## 6. 다음 확장
+## 6. 미디어 확장
 
-- `/w/[slug]/upload` → `feat/guest-upload` (GCS/로컬 원본)
-- Google Drive 사본 전달
-- 갤러리 섹션 JSON
+메인 사진·웨딩 갤러리(레이아웃 포함)는 `docs/invitation-media.md` 참고.  
+신랑·신부 개별 사진 슬롯은 없고 갤러리에 함께 올린다.
