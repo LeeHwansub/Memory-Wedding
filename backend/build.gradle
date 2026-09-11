@@ -37,6 +37,9 @@ dependencies {
     // BOM manages compatible guava/protobuf/gcs versions
     implementation 'com.google.cloud:google-cloud-storage'
     implementation 'com.google.protobuf:protobuf-java'
+    implementation 'com.google.auth:google-auth-library-oauth2-http'
+    implementation 'com.google.apis:google-api-services-drive:v3-rev20260901-2.0.0'
+    implementation 'com.google.http-client:google-http-client-gson'
 
     runtimeOnly('com.mysql:mysql-connector-j') {
         exclude group: 'com.google.protobuf', module: 'protobuf-java'

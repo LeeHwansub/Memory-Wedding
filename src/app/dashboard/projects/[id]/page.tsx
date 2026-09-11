@@ -80,7 +80,7 @@ export default function ProjectDetailPage() {
         <NavCard href={`/dashboard/projects/${project.id}/guestbook`} title="방명록 관리" />
         <NavCard href={`/dashboard/projects/${project.id}/gallery`} title="업로드 갤러리" />
         <NavCard href={`/dashboard/projects/${project.id}/share`} title="하객 초대 / QR" />
-        <NavCard href={`/w/${project.slug}`} title="청첩장 미리보기" />
+        <NavCard href={`/w/${project.slug}?from=${project.id}`} title="청첩장 미리보기" />
       </div>
 
       <dl className="mb-8 space-y-3 rounded-2xl border border-accent/20 bg-white/60 p-6 text-sm">

@@ -76,6 +76,6 @@ GCS_CREDENTIALS_PATH=/secrets/your-sa.json   # 컨테이너 경로
 
 ## 6. 다음
 
-- `feat/google-drive`: Drive OAuth + 원본 → Drive **사본** 업로드
+- Drive 삭제 정책·비동기 큐·용량 표시 → `docs/google-drive.md`
 - 공개 청첩장에 갤러리 미리보기
 - 영상 썸네일

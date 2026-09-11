@@ -13,6 +13,7 @@ import com.memorywedding.domain.repository.InvitationRepository;
 import com.memorywedding.domain.repository.InviteLinkRepository;
 import com.memorywedding.domain.repository.UploadFileRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
+import com.memorywedding.drive.DriveSyncService;
 import com.memorywedding.storage.ObjectStorage;
 import com.memorywedding.upload.dto.UploadFileResponse;
 import com.memorywedding.upload.dto.UploadFolderTreeResponse;
@@ -53,6 +54,7 @@ public class UploadService {
     private final InviteLinkRepository inviteLinkRepository;
     private final InvitationRepository invitationRepository;
     private final ObjectStorage objectStorage;
+    private final DriveSyncService driveSyncService;
 
     @Transactional
     public UploadFileResponse uploadPublic(String slug, String guestName, MultipartFile file) {
@@ -93,7 +95,9 @@ public class UploadService {
             throw new BadRequestException("파일 업로드에 실패했습니다.");
         }
 
-        return UploadFileResponse.from(entity);
+        driveSyncService.syncAfterUploadBestEffort(entity.getId());
+        UploadFile latest = uploadFileRepository.findById(entity.getId()).orElse(entity);
+        return UploadFileResponse.from(latest);
     }
 
     public UploadPageResponse listPublic(String slug, int page, int size) {

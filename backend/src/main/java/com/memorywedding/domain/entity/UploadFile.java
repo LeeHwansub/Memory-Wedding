@@ -112,4 +112,9 @@ public class UploadFile extends BaseTimeEntity {
     public boolean isDeleted() {
         return deletedAt != null;
     }
+
+    public void markDriveSynced(String driveFileId, String driveFolderPath) {
+        this.driveFileId = driveFileId;
+        this.driveFolderPath = driveFolderPath;
+    }
 }

@@ -44,4 +44,16 @@ public interface UploadFileRepository extends JpaRepository<UploadFile, Long> {
             @Param("fileType") FileType fileType);
 
     Optional<UploadFile> findByIdAndProject_IdAndDeletedAtIsNull(Long id, Long projectId);
+
+    long countByProject_IdAndUploadStatusAndDriveFileIdIsNullAndDeletedAtIsNull(
+            Long projectId,
+            UploadStatus uploadStatus);
+
+    long countByProject_IdAndUploadStatusAndDriveFileIdIsNotNullAndDeletedAtIsNull(
+            Long projectId,
+            UploadStatus uploadStatus);
+
+    java.util.List<UploadFile> findByProject_IdAndUploadStatusAndDriveFileIdIsNullAndDeletedAtIsNullOrderByCreatedAtAsc(
+            Long projectId,
+            UploadStatus uploadStatus);
 }

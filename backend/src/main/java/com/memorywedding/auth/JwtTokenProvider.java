@@ -35,6 +35,38 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    /** Short-lived signed state for Google Drive OAuth callback. */
+    public String createDriveOAuthState(Long memberId, Long projectId) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + 10 * 60 * 1000);
+        var builder = Jwts.builder()
+                .subject(String.valueOf(memberId))
+                .claim("purpose", "drive_oauth")
+                .issuedAt(now)
+                .expiration(expiry);
+        if (projectId != null) {
+            builder.claim("projectId", projectId);
+        }
+        return builder.signWith(secretKey).compact();
+    }
+
+    public Long parseDriveOAuthState(String state) {
+        Claims claims = parseClaims(state);
+        if (!"drive_oauth".equals(claims.get("purpose", String.class))) {
+            throw new IllegalArgumentException("Invalid drive oauth state");
+        }
+        return Long.parseLong(claims.getSubject());
+    }
+
+    public Long parseDriveOAuthProjectId(String state) {
+        Claims claims = parseClaims(state);
+        Object value = claims.get("projectId");
+        if (value == null) {
+            return null;
+        }
+        return Long.parseLong(String.valueOf(value));
+    }
+
     public Long getMemberId(String token) {
         Claims claims = parseClaims(token);
         return Long.parseLong(claims.getSubject());

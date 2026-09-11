@@ -58,6 +58,8 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
   jwt:
     secret: ${JWT_SECRET}
+  drive:
+    redirect-uri: ${DRIVE_REDIRECT_URI:http://localhost:8080/api/drive/oauth/callback}
   storage:
     type: ${STORAGE_TYPE:local}
     local-path: ${STORAGE_LOCAL_PATH:/app/data/uploads}

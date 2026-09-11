@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { StatusModal } from "@/components/ui/StatusModal";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import type {
@@ -18,6 +19,20 @@ type View =
   | { level: "type"; fileType: FileType }
   | { level: "guest"; fileType: FileType; guestName: string };
 
+type ProjectDriveStatus = {
+  driveConnected: boolean;
+  googleAccountEmail: string | null;
+  pendingSyncCount: number;
+  syncedCount: number;
+};
+
+type SyncModal =
+  | null
+  | { kind: "progress"; step: number; description?: string }
+  | { kind: "done"; description: string };
+
+const SYNC_STEPS = ["Drive 연결 확인", "폴더 준비", "파일 사본 업로드"];
+
 export default function ProjectGalleryPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -29,12 +44,21 @@ export default function ProjectGalleryPage() {
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Record<number, string>>({});
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [drive, setDrive] = useState<ProjectDriveStatus | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncModal, setSyncModal] = useState<SyncModal>(null);
 
   const loadTree = useCallback(async () => {
     const res = await apiFetch<UploadFolderTree>(
       `/api/projects/${params.id}/uploads/folders`,
     );
     setTree(res.data);
+    return res.data;
+  }, [params.id]);
+
+  const loadDrive = useCallback(async () => {
+    const res = await apiFetch<ProjectDriveStatus>(`/api/projects/${params.id}/drive`);
+    setDrive(res.data);
     return res.data;
   }, [params.id]);
 
@@ -62,15 +86,18 @@ export default function ProjectGalleryPage() {
     setError(null);
     const task =
       view.level === "guest"
-        ? loadGuestFiles()
-        : loadTree().then(() => {
-            setPageData(null);
-            setPage(0);
-          });
+        ? Promise.all([loadGuestFiles(), loadDrive()])
+        : Promise.all([
+            loadTree().then(() => {
+              setPageData(null);
+              setPage(0);
+            }),
+            loadDrive(),
+          ]);
     task
       .catch((err) => setError(err instanceof Error ? err.message : "조회 실패"))
       .finally(() => setLoading(false));
-  }, [loadGuestFiles, loadTree, router, view]);
+  }, [loadDrive, loadGuestFiles, loadTree, router, view]);
 
   useEffect(() => {
     const files = pageData?.content ?? [];
@@ -113,11 +140,58 @@ export default function ProjectGalleryPage() {
     setDeletingId(file.id);
     try {
       await apiFetch(`/api/projects/${params.id}/uploads/${file.id}`, { method: "DELETE" });
-      await Promise.all([loadGuestFiles(), loadTree()]);
+      await Promise.all([loadGuestFiles(), loadTree(), loadDrive()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "삭제 실패");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleSyncPending() {
+    if (!drive?.driveConnected) {
+      setError("먼저 기본 정보에서 Google Drive를 연결해 주세요.");
+      return;
+    }
+    setSyncBusy(true);
+    setError(null);
+    setSyncModal({
+      kind: "progress",
+      step: 0,
+      description: "Drive 연결 상태를 확인합니다.",
+    });
+    try {
+      setSyncModal({
+        kind: "progress",
+        step: 1,
+        description: "프로젝트 폴더를 준비하고 있습니다.",
+      });
+      await apiFetch(`/api/projects/${params.id}/drive/folders`, { method: "POST" });
+      setSyncModal({
+        kind: "progress",
+        step: 2,
+        description: "대기 중인 파일을 Drive로 복사하고 있습니다.",
+      });
+      const res = await apiFetch<{ synced: number; failed: number }>(
+        `/api/projects/${params.id}/drive/sync-pending`,
+        { method: "POST" },
+      );
+      const result = res.data;
+      const description = result
+        ? `성공 ${result.synced}건` +
+          (result.failed > 0 ? ` · 실패 ${result.failed}건` : "")
+        : "동기화가 완료되었습니다.";
+      setSyncModal({ kind: "done", description });
+      await Promise.all([
+        loadDrive(),
+        loadTree(),
+        view.level === "guest" ? loadGuestFiles() : Promise.resolve(null),
+      ]);
+    } catch (err) {
+      setSyncModal(null);
+      setError(err instanceof Error ? err.message : "동기화 실패");
+    } finally {
+      setSyncBusy(false);
     }
   }
 
@@ -167,15 +241,40 @@ export default function ProjectGalleryPage() {
       >
         ← Project
       </Link>
-      <h1
-        className="mt-4 mb-2 text-3xl font-light"
-        style={{ fontFamily: "var(--font-playfair), serif" }}
-      >
-        업로드 갤러리
-      </h1>
+      <div className="mt-4 mb-2 flex flex-wrap items-end justify-between gap-3">
+        <h1
+          className="text-3xl font-light"
+          style={{ fontFamily: "var(--font-playfair), serif" }}
+        >
+          업로드 갤러리
+        </h1>
+        <button
+          type="button"
+          disabled={syncBusy}
+          onClick={handleSyncPending}
+          className="rounded-full border border-accent/30 px-4 py-2 text-xs disabled:opacity-50"
+        >
+          {drive?.driveConnected
+            ? `Drive 동기화${(drive.pendingSyncCount ?? 0) > 0 ? ` (${drive.pendingSyncCount})` : ""}`
+            : "Drive 동기화"}
+        </button>
+      </div>
       <Breadcrumb view={view} onRoot={goRoot} onType={goType} />
       <p className="mb-8 text-sm text-muted">
         사진·영상 → 하객 이름 순으로 모아 둡니다.
+        {!drive?.driveConnected && (
+          <>
+            {" "}
+            Drive 연결은{" "}
+            <Link
+              href={`/dashboard/projects/${params.id}/edit`}
+              className="underline underline-offset-2"
+            >
+              기본 정보
+            </Link>
+            에서 할 수 있습니다.
+          </>
+        )}
       </p>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
@@ -195,8 +294,8 @@ export default function ProjectGalleryPage() {
         </ul>
       )}
 
-      {view.level === "type" && (
-        guestFolders.length === 0 ? (
+      {view.level === "type" &&
+        (guestFolders.length === 0 ? (
           <EmptyState label="이 폴더에 파일이 없습니다." />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
@@ -209,11 +308,10 @@ export default function ProjectGalleryPage() {
               />
             ))}
           </ul>
-        )
-      )}
+        ))}
 
-      {view.level === "guest" && (
-        loading && !pageData ? (
+      {view.level === "guest" &&
+        (loading && !pageData ? (
           <p className="text-sm text-muted">로딩 중...</p>
         ) : entries.length === 0 ? (
           <EmptyState label="아직 업로드된 파일이 없습니다." />
@@ -285,8 +383,23 @@ export default function ProjectGalleryPage() {
               </div>
             )}
           </>
-        )
-      )}
+        ))}
+
+      <StatusModal
+        open={syncModal?.kind === "progress"}
+        title="Drive 동기화"
+        description={syncModal?.kind === "progress" ? syncModal.description : undefined}
+        steps={SYNC_STEPS}
+        activeStep={syncModal?.kind === "progress" ? syncModal.step : 0}
+      />
+      <StatusModal
+        open={syncModal?.kind === "done"}
+        title="동기화 완료"
+        description={syncModal?.kind === "done" ? syncModal.description : undefined}
+        steps={SYNC_STEPS}
+        done
+        onConfirm={() => setSyncModal(null)}
+      />
     </main>
   );
 }
