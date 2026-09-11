@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -69,14 +68,8 @@ export default function ProjectGuestbookManagePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
-      <Link
-        href={`/dashboard/projects/${params.id}`}
-        className="text-sm text-muted hover:underline"
-      >
-        ← Project
-      </Link>
-      <div className="mt-4 mb-8 flex flex-wrap items-end justify-between gap-3">
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-10 sm:py-14">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1
             className="text-3xl font-light"

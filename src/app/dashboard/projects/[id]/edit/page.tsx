@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AddressSearchField } from "@/components/ui/AddressSearchField";
@@ -187,15 +186,9 @@ export default function EditProjectPage() {
       : "연결됨";
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
-      <Link
-        href={`/dashboard/projects/${params.id}`}
-        className="text-sm text-muted hover:underline"
-      >
-        ← Project
-      </Link>
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-10 sm:py-14">
       <h1
-        className="mt-4 mb-8 text-3xl font-light"
+        className="mb-8 text-3xl font-light"
         style={{ fontFamily: "var(--font-playfair), serif" }}
       >
         기본 정보 수정

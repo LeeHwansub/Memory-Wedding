@@ -33,14 +33,15 @@ export default function PublicInvitationPage() {
   const [loading, setLoading] = useState(true);
   const [showPreviewChrome, setShowPreviewChrome] = useState(false);
   const fromProjectId = searchParams.get("from");
+  const embed = searchParams.get("embed") === "1";
 
   useEffect(() => {
-    setShowPreviewChrome(Boolean(getToken()));
+    setShowPreviewChrome(Boolean(getToken()) && !embed);
     apiPublicFetch<PublicInvitation>(`/api/public/w/${params.slug}`)
       .then((res) => setData(res.data))
       .catch((err) => setError(err instanceof Error ? err.message : "불러오기 실패"))
       .finally(() => setLoading(false));
-  }, [params.slug]);
+  }, [embed, params.slug]);
 
   if (loading) {
     return (

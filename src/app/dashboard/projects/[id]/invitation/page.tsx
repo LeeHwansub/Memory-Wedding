@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { BankPicker } from "@/components/ui/BankPicker";
+import { useProjectPreview } from "@/components/shell/ProjectShell";
 import { apiFetch } from "@/lib/api";
 import { findBankByName } from "@/lib/banks";
 import { getToken } from "@/lib/auth";
@@ -18,6 +18,7 @@ const emptyAccount = (): AccountEntry => ({
 export default function InvitationEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { openPreview } = useProjectPreview();
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [title, setTitle] = useState("");
   const [greetingMessage, setGreetingMessage] = useState("");
@@ -137,24 +138,18 @@ export default function InvitationEditPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
-      <Link
-        href={`/dashboard/projects/${params.id}`}
-        className="text-sm text-muted hover:underline"
-      >
-        ← Project
-      </Link>
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-10 sm:py-14">
       <h1
-        className="mt-4 mb-2 text-3xl font-light"
+        className="mb-2 text-3xl font-light"
         style={{ fontFamily: "var(--font-playfair), serif" }}
       >
         청첩장 편집
       </h1>
       <p className="mb-8 text-sm text-muted">
         상태: {invitation.published ? "공개" : "비공개"} ·{" "}
-        <Link href={invitation.guestPath} className="underline" target="_blank">
+        <button type="button" onClick={openPreview} className="underline">
           미리보기
-        </Link>
+        </button>
       </p>
 
       <div className="mb-6 rounded-2xl border border-accent/20 bg-white/60 p-4 text-sm">

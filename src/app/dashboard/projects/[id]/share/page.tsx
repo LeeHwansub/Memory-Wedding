@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -60,15 +59,9 @@ export default function ShareProjectPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-6 py-16">
-      <Link
-        href={`/dashboard/projects/${params.id}`}
-        className="text-sm text-muted hover:underline"
-      >
-        ← Project
-      </Link>
+    <main className="mx-auto min-h-screen max-w-xl px-6 py-10 sm:py-14">
       <h1
-        className="mt-4 mb-8 text-3xl font-light"
+        className="mb-8 text-3xl font-light"
         style={{ fontFamily: "var(--font-playfair), serif" }}
       >
         하객 초대

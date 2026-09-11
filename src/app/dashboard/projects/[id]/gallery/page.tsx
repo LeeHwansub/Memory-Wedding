@@ -234,14 +234,8 @@ export default function ProjectGalleryPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <Link
-        href={`/dashboard/projects/${params.id}`}
-        className="text-sm text-muted hover:underline"
-      >
-        ← Project
-      </Link>
-      <div className="mt-4 mb-2 flex flex-wrap items-end justify-between gap-3">
+    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10 sm:py-14">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
         <h1
           className="text-3xl font-light"
           style={{ fontFamily: "var(--font-playfair), serif" }}
