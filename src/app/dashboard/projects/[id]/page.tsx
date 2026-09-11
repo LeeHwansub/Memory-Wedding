@@ -1,16 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useProjectPreview } from "@/components/shell/ProjectShell";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { formatWeddingDateTime } from "@/lib/datetime";
+import { PROJECT_NAV } from "@/lib/project-nav";
 import type { WeddingProject } from "@/types";
+
+const ICONS: Record<string, React.ReactNode> = {
+  home: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-10.5Z" />
+    </svg>
+  ),
+  edit: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="m13.5 6.5 3 3" />
+    </svg>
+  ),
+  invitation: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  ),
+  guestbook: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M7 4h10a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2V6a2 2 0 0 1 2-2Z" />
+      <path d="M8 9h8M8 13h5" />
+    </svg>
+  ),
+  gallery: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m21 15-4.5-4.5L8 19" />
+    </svg>
+  ),
+  share: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      <path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6" />
+    </svg>
+  ),
+  preview: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="8" y="2" width="8" height="20" rx="2" />
+      <path d="M11 18h2" />
+    </svg>
+  ),
+};
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
+  const pathname = usePathname();
   const router = useRouter();
+  const { openPreview } = useProjectPreview();
   const [project, setProject] = useState<WeddingProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +91,7 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-[50vh] items-center justify-center">
         <p className="text-muted">로딩 중...</p>
       </main>
     );
@@ -50,21 +101,14 @@ export default function ProjectDetailPage() {
     return (
       <main className="mx-auto max-w-xl px-6 py-16">
         <p className="text-red-600">{error ?? "Project를 찾을 수 없습니다."}</p>
-        <Link href="/dashboard" className="mt-4 inline-block text-sm underline">
-          대시보드로
-        </Link>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <Link href="/dashboard" className="text-sm text-muted hover:underline">
-        ← 대시보드
-      </Link>
-
+    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10 sm:py-14">
       <h1
-        className="mt-4 mb-2 text-4xl font-light"
+        className="mb-2 text-3xl font-light sm:text-4xl"
         style={{ fontFamily: "var(--font-playfair), serif" }}
       >
         {project.groomName} ♥ {project.brideName}
@@ -74,13 +118,30 @@ export default function ProjectDetailPage() {
         {project.venueName ? ` · ${project.venueName}` : ""}
       </p>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2">
-        <NavCard href={`/dashboard/projects/${project.id}/edit`} title="기본 정보 수정" />
-        <NavCard href={`/dashboard/projects/${project.id}/invitation`} title="청첩장 편집" />
-        <NavCard href={`/dashboard/projects/${project.id}/guestbook`} title="방명록 관리" />
-        <NavCard href={`/dashboard/projects/${project.id}/gallery`} title="업로드 갤러리" />
-        <NavCard href={`/dashboard/projects/${project.id}/share`} title="하객 초대 / QR" />
-        <NavCard href={`/w/${project.slug}?from=${project.id}`} title="청첩장 미리보기" />
+      <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {PROJECT_NAV.filter((item) => item.key !== "home").map((item) => {
+          if (item.action === "preview") {
+            return (
+              <TileButton
+                key={item.key}
+                label={item.label}
+                icon={ICONS[item.key]}
+                onClick={openPreview}
+              />
+            );
+          }
+          const href = item.href?.(String(project.id)) ?? "#";
+          const active = pathname.startsWith(href);
+          return (
+            <TileLink
+              key={item.key}
+              href={href}
+              label={item.label}
+              icon={ICONS[item.key]}
+              active={active}
+            />
+          );
+        })}
       </div>
 
       <dl className="mb-8 space-y-3 rounded-2xl border border-accent/20 bg-white/60 p-6 text-sm">
@@ -88,10 +149,7 @@ export default function ProjectDetailPage() {
         <Row label="Slug" value={project.slug} />
         <Row label="하객 경로" value={project.guestPath ?? `/w/${project.slug}`} />
         <Row label="주소" value={project.venueAddress || "-"} />
-        <Row
-          label="초대 링크"
-          value={project.inviteActive ? "활성" : "비활성"}
-        />
+        <Row label="초대 링크" value={project.inviteActive ? "활성" : "비활성"} />
       </dl>
 
       <button
@@ -105,14 +163,50 @@ export default function ProjectDetailPage() {
   );
 }
 
-function NavCard({ href, title }: { href: string; title: string }) {
+function TileLink({
+  href,
+  label,
+  icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+}) {
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-accent/20 bg-white/70 px-5 py-4 text-sm font-medium transition hover:border-accent/40"
+      className={`flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border text-center transition ${
+        active
+          ? "border-foreground bg-foreground text-background"
+          : "border-accent/20 bg-white/70 text-foreground hover:border-accent/40 hover:bg-white"
+      }`}
     >
-      {title} →
+      <span className={active ? "text-background" : "text-[#8B7355]"}>{icon}</span>
+      <span className="text-xs font-medium sm:text-sm">{label}</span>
     </Link>
+  );
+}
+
+function TileButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-white/70 text-center transition hover:border-accent/40 hover:bg-white"
+    >
+      <span className="text-[#8B7355]">{icon}</span>
+      <span className="text-xs font-medium sm:text-sm">{label}</span>
+    </button>
   );
 }
 

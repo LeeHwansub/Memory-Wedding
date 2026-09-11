@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { clearToken, getToken } from "@/lib/auth";
+import { getToken } from "@/lib/auth";
 import { formatWeddingDateTime } from "@/lib/datetime";
 import type { WeddingProject } from "@/types";
 
@@ -40,11 +40,6 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  function handleLogout() {
-    clearToken();
-    router.replace("/login");
-  }
-
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -54,26 +49,17 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <p className="mb-2 text-sm tracking-[0.3em] text-muted uppercase">
-            Dashboard
-          </p>
-          <h1
-            className="text-4xl font-light"
-            style={{ fontFamily: "var(--font-playfair), serif" }}
-          >
-            안녕하세요, {member?.displayName}님
-          </h1>
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-full border border-accent/40 px-4 py-2 text-sm transition hover:bg-accent-soft"
+    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10 sm:py-14">
+      <div className="mb-8">
+        <p className="mb-2 text-sm tracking-[0.3em] text-muted uppercase">
+          Dashboard
+        </p>
+        <h1
+          className="text-4xl font-light"
+          style={{ fontFamily: "var(--font-playfair), serif" }}
         >
-          로그아웃
-        </button>
+          안녕하세요, {member?.displayName}님
+        </h1>
       </div>
 
       <section className="mb-10">
