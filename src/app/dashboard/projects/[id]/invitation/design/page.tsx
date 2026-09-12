@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { InvitationDesignPreview } from "@/components/invitation/InvitationDesignPreview";
 import { InvitationImage } from "@/components/invitation/InvitationImage";
 import { apiFetch, apiUpload } from "@/lib/api";
@@ -54,6 +54,9 @@ export default function InvitationDesignPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("edit");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const skipAutoSave = useRef(true);
+  const savingRef = useRef(false);
 
   function settingsSnapshot(data: {
     galleryLayout: GalleryLayout;
@@ -138,12 +141,13 @@ export default function InvitationDesignPage() {
     mainFocalY,
   ]);
 
-  async function handleSave(event?: FormEvent) {
+  async function handleSave(event?: FormEvent, options?: { silent?: boolean }) {
     event?.preventDefault();
-    if (!invitation) return;
+    if (!invitation || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError(null);
-    setMessage(null);
+    if (!options?.silent) setMessage(null);
     try {
       const res = await apiFetch<Invitation>(`/api/projects/${params.id}/invitation`, {
         method: "PUT",
@@ -163,13 +167,39 @@ export default function InvitationDesignPage() {
         }),
       });
       if (res.data) applyInvitation(res.data);
-      setMessage("디자인 설정이 저장되었습니다.");
+      setMessage(options?.silent ? "자동 저장됨" : "디자인 설정이 저장되었습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (loading || !invitation) return;
+    if (skipAutoSave.current) {
+      skipAutoSave.current = false;
+      return;
+    }
+    if (!dirty) return;
+    const timer = window.setTimeout(() => {
+      void handleSave(undefined, { silent: true });
+    }, 1100);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on settings dirty only
+  }, [
+    dirty,
+    galleryLayout,
+    galleryColumns,
+    galleryImageSize,
+    mainPhotoSize,
+    mainPhotoPlacement,
+    mainBrightness,
+    mainSaturation,
+    mainFocalX,
+    mainFocalY,
+  ]);
 
   async function uploadOne(type: "MAIN" | "GALLERY", file: File) {
     const formData = new FormData();
@@ -239,12 +269,7 @@ export default function InvitationDesignPage() {
     }
   }
 
-  async function moveGallery(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= gallery.length) return;
-    const next = [...gallery];
-    const [item] = next.splice(index, 1);
-    next.splice(nextIndex, 0, item);
+  async function persistGalleryOrder(next: InvitationMedia[]) {
     setGallery(next);
     try {
       const res = await apiFetch<Invitation>(
@@ -258,6 +283,27 @@ export default function InvitationDesignPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "순서 변경 실패");
     }
+  }
+
+  async function moveGallery(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= gallery.length) return;
+    const next = [...gallery];
+    const [item] = next.splice(index, 1);
+    next.splice(nextIndex, 0, item);
+    await persistGalleryOrder(next);
+  }
+
+  async function dropGallery(toIndex: number) {
+    if (dragIndex === null || dragIndex === toIndex) {
+      setDragIndex(null);
+      return;
+    }
+    const next = [...gallery];
+    const [item] = next.splice(dragIndex, 1);
+    next.splice(toIndex, 0, item);
+    setDragIndex(null);
+    await persistGalleryOrder(next);
   }
 
   function setFocalFromClick(
@@ -595,13 +641,22 @@ export default function InvitationDesignPage() {
                 {gallery.map((item, index) => (
                   <li
                     key={item.id}
-                    className="overflow-hidden rounded-xl border border-accent/20 bg-white"
+                    draggable
+                    onDragStart={() => setDragIndex(index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => void dropGallery(index)}
+                    onDragEnd={() => setDragIndex(null)}
+                    className={`overflow-hidden rounded-xl border bg-white ${
+                      dragIndex === index
+                        ? "border-accent opacity-70"
+                        : "border-accent/20"
+                    }`}
                   >
                     <InvitationImage
                       auth
                       contentPath={item.contentPath}
                       alt=""
-                      className="aspect-square w-full object-cover"
+                      className="aspect-square w-full cursor-grab object-cover active:cursor-grabbing"
                     />
                     <div className="flex items-center justify-between gap-1 px-1.5 py-1">
                       <button
@@ -633,6 +688,9 @@ export default function InvitationDesignPage() {
                   </li>
                 ))}
               </ul>
+            )}
+            {gallery.length > 1 && (
+              <p className="text-[11px] text-muted">썸네일을 드래그해 순서를 바꿀 수 있습니다.</p>
             )}
           </section>
 
