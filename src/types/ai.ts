@@ -36,6 +36,7 @@ export type AiPhotoResult = {
   objects?: string[];
   place?: string | null;
   frameCount?: number | null;
+  duplicate?: boolean;
   analyzedAt?: string | null;
 };
 

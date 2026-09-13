@@ -54,6 +54,7 @@ public class AiHighlightWriteService {
                 .stream()
                 .filter(AiPhotoResult::isBestShot)
                 .filter(this::meetsConfidence)
+                .filter(r -> !isDuplicate(r))
                 .filter(r -> {
                     FileType type = r.getUploadFile().getFileType();
                     return type == FileType.PHOTO || type == FileType.VIDEO;
@@ -111,5 +112,13 @@ public class AiHighlightWriteService {
     private boolean meetsConfidence(AiPhotoResult result) {
         BigDecimal min = BigDecimal.valueOf(geminiProperties.getMinConfidence());
         return result.getConfidence() != null && result.getConfidence().compareTo(min) >= 0;
+    }
+
+    private boolean isDuplicate(AiPhotoResult result) {
+        String metadata = result.getMetadataJson();
+        if (metadata == null || metadata.isBlank()) {
+            return false;
+        }
+        return metadata.contains("\"duplicate\":true") || metadata.contains("\"duplicate\": true");
     }
 }
