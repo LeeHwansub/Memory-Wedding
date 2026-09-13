@@ -356,7 +356,7 @@ flowchart LR
 | 방명록 | ✅ | |
 | 관리자 기본 | ✅ | |
 | AI 장면 분류 · Best Shot | ✅ | 중복 제거·감정·인물 그룹화 (FR-AI-016~018) |
-| FFmpeg 하이라이트 · Drive AI/Archive | ✅ | BGM·자막·스타일·길이 (FR-AI-012~015), 영상 클립 포함 |
+| FFmpeg 하이라이트 · Drive AI/Archive | ✅ | BGM·자막·스타일·길이 (FR-AI-012~015) |
 | AI 비동기 Queue · 실 진행률 | ✅ 1차 (@Async) | 외부 Broker·재시도 |
 | CI/CD 배포 | | ✅ |
 

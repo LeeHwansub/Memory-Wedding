@@ -13,8 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Extracts evenly spaced JPEG frames from a video using FFmpeg.
- * Returns empty list when FFmpeg is missing or extraction fails.
+ * FFmpeg로 영상에서 균등 간격 JPEG 프레임을 추출합니다.
+ * FFmpeg가 없거나 실패하면 빈 목록을 반환합니다.
  */
 @Slf4j
 @Component
@@ -33,9 +33,9 @@ public class VideoFrameExtractor {
     }
 
     /**
-     * @param videoBytes raw video file bytes
-     * @param frameCount desired number of frames (clamped to at least 1)
-     * @return JPEG frame bytes (may be fewer than frameCount)
+     * @param videoBytes 원본 영상 바이트
+     * @param frameCount 원하는 프레임 수 (최소 1)
+     * @return JPEG 프레임 바이트 목록 (요청 수보다 적을 수 있음)
      */
     public List<byte[]> extractFrames(byte[] videoBytes, int frameCount) {
         if (videoBytes == null || videoBytes.length == 0) {
@@ -58,7 +58,7 @@ public class VideoFrameExtractor {
                 durationSec = Math.max(1.0, count);
             }
 
-            // fps so that ffmpeg emits ~count frames across the clip
+            // 클립 전체에 걸쳐 약 count개 프레임이 나오도록 fps 설정
             double fps = count / durationSec;
             if (fps <= 0) {
                 fps = 1.0 / durationSec;
@@ -149,11 +149,11 @@ public class VideoFrameExtractor {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best-effort cleanup
+                    // 정리 실패는 무시
                 }
             });
         } catch (IOException ignored) {
-            // best-effort cleanup
+            // 정리 실패는 무시
         }
     }
 }

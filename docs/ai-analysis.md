@@ -20,7 +20,7 @@
 | FR-AI-003 | 동영상 분석 | ✅ | 프레임 추출 + 장면 집계 |
 | FR-AI-004 | 장면 분류 | ✅ | ENTRANCE·SONG·GROUP_PHOTO·RECEPTION·OTHER |
 | FR-AI-005 | Best Shot 선정 | ✅ | confidence 임계값 이상만 |
-| FR-AI-006 | 하이라이트 영상 생성 | ✅ 1차 | Best Shot **PHOTO** 슬라이드쇼 (Ken Burns) |
+| FR-AI-006 | 하이라이트 영상 생성 | ✅ | Best Shot PHOTO(Ken Burns) + VIDEO(앞부분 ~4초) |
 | FR-AI-007 | Drive AI/Archive 저장 | ✅ 1차 | 하이라이트 MP4 best-effort |
 | FR-AI-008 | 생성 진행 상태 | ✅ 1차 | **비동기 Job + FE 폴링** (`processedFiles` / `processedClips`). Redis Queue는 후속 |
 | FR-AI-009 | 생성 완료 안내 | ✅ 1차 | 페이지 내 배너·메시지. 푸시/메일은 후속 |
@@ -110,14 +110,15 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 
 ## 8. 하이라이트 영상 (FR-AI-006 · 007)
 
-1. 최근 분석 Job의 Best Shot 중 **PHOTO**만 사용
-2. **예식 흐름 순서:** 입장 → 축가 → 단체사진 → 피로연 → 기타 (같은 장면은 confidence 높은 순)
-3. FFmpeg 자동 편집 (2-pass):
-   - 장당 **고정 길이 클립** 렌더 (Ken Burns 줌 + 페이드 인/아웃)
-   - 클립 concat (단일 xfade 그래프는 타임스탬프 꼬임으로 제외)
-   - 1280×720, 장당 약 3.2초
-4. `ai_video_job` + ObjectStorage(`ai-highlight/{projectId}/...mp4`)
-5. Drive 연동 시 `AI/` · `Archive/`에 `highlight-{slug}-{jobId}.mp4` best-effort 업로드  
+1. 최근 분석 Job의 Best Shot **PHOTO + VIDEO** (confidence 통과분)
+2. VIDEO는 `GEMINI_MAX_VIDEOS`개까지 포함
+3. **예식 흐름 순서:** 입장 → 축가 → 단체사진 → 피로연 → 기타 (같은 장면: PHOTO 우선 → confidence)
+4. FFmpeg 자동 편집 (2-pass):
+   - PHOTO: Ken Burns 줌 + 페이드 (~3.2초)
+   - VIDEO: 원본 **앞부분 ~4초** trim → 1280×720 pad/scale · 30fps · 무음 · 페이드
+   - 클립 concat (재인코딩으로 PTS 통일)
+5. `ai_video_job` + ObjectStorage(`ai-highlight/{projectId}/...mp4`)
+6. Drive 연동 시 `AI/` · `Archive/`에 `highlight-{slug}-{jobId}.mp4` best-effort 업로드  
    (`drive_file_id` = AI 폴더 파일 ID). 미연동·실패해도 Job은 COMPLETED 유지
 
 ### 진행 · 완료 · 재생성 (FR-AI-008~010)
@@ -152,6 +153,6 @@ Gemini env는 `docker-compose.yml` / `.env`로 전달. AI·ffmpeg 변경 후: `d
 ## 11. 후속 (우선순위 제안)
 
 1. Redis 등 외부 Queue · 재시도/데드레터 (NFR-003 고도화)
-2. 하이라이트에 **영상 클립** 포함
-3. **FR-AI-012~015** — BGM · 자막 · 스타일 · 길이
-4. FR-AI-009 푸시/메일 · FR-AI-016~018
+2. **FR-AI-012~015** — BGM · 자막 · 스타일 · 길이
+3. FR-AI-009 푸시/메일 · FR-AI-016~018
+4. VIDEO 중간 하이라이트 구간 자동 선정 (현재는 앞부분 trim)

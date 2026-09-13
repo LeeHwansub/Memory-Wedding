@@ -12,6 +12,7 @@ import com.memorywedding.domain.repository.AiAnalysisJobRepository;
 import com.memorywedding.domain.repository.AiPhotoResultRepository;
 import com.memorywedding.domain.repository.AiVideoJobRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +35,12 @@ public class AiHighlightWriteService {
         return job.getProject().getId();
     }
 
+    /**
+     * Best Shot 사진·영상을 장면 흐름 순으로 가져옵니다.
+     * 영상 개수는 분석용 상한(GEMINI_MAX_VIDEOS)을 따릅니다.
+     */
     @Transactional(readOnly = true)
-    public List<AiPhotoResult> loadBestPhotos(Long projectId) {
+    public List<AiPhotoResult> loadHighlightAssets(Long projectId) {
         AiAnalysisJob analysis = aiAnalysisJobRepository
                 .findFirstByProject_IdOrderByCreatedAtDesc(projectId)
                 .orElseThrow(() -> new BadRequestException("먼저 AI 분석을 실행해 주세요."));
@@ -44,14 +49,19 @@ public class AiHighlightWriteService {
             throw new BadRequestException("AI 분석이 완료된 후 하이라이트를 생성할 수 있습니다.");
         }
 
-        return aiPhotoResultRepository
+        List<AiPhotoResult> bestShots = aiPhotoResultRepository
                 .findByJob_IdOrderBySceneCategoryAscIdAsc(analysis.getId())
                 .stream()
                 .filter(AiPhotoResult::isBestShot)
                 .filter(this::meetsConfidence)
-                .filter(r -> r.getUploadFile().getFileType() == FileType.PHOTO)
+                .filter(r -> {
+                    FileType type = r.getUploadFile().getFileType();
+                    return type == FileType.PHOTO || type == FileType.VIDEO;
+                })
                 .sorted(Comparator
                         .comparingInt((AiPhotoResult r) -> r.getSceneCategory().ordinal())
+                        .thenComparingInt((AiPhotoResult r) ->
+                                r.getUploadFile().getFileType() == FileType.PHOTO ? 0 : 1)
                         .thenComparing(
                                 (AiPhotoResult r) -> r.getConfidence() == null
                                         ? BigDecimal.ZERO
@@ -65,6 +75,20 @@ public class AiHighlightWriteService {
                     file.getFileType();
                 })
                 .toList();
+
+        int maxVideos = Math.max(0, geminiProperties.getMaxVideos());
+        List<AiPhotoResult> selected = new ArrayList<>();
+        int videoCount = 0;
+        for (AiPhotoResult result : bestShots) {
+            if (result.getUploadFile().getFileType() == FileType.VIDEO) {
+                if (videoCount >= maxVideos) {
+                    continue;
+                }
+                videoCount += 1;
+            }
+            selected.add(result);
+        }
+        return selected;
     }
 
     private boolean meetsConfidence(AiPhotoResult result) {
