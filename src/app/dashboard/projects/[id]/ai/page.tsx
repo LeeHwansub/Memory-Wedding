@@ -8,6 +8,7 @@ import {
   SCENE_LABELS,
   isVideoResult,
   type AiDashboard,
+  type AiJobStatus,
   type AiPhotoResult,
   type AiVideoJob,
   type SceneCategory,
@@ -20,6 +21,27 @@ const HIGHLIGHT_STEPS = [
   "Drive 저장(연동 시)",
 ] as const;
 
+const POLL_MS = 1500;
+
+function isActive(status?: AiJobStatus | null) {
+  return status === "PENDING" || status === "PROCESSING";
+}
+
+function analysisPercent(job: AiDashboard["latestJob"]) {
+  if (!job || job.totalFiles <= 0) return 0;
+  return Math.min(100, Math.round((job.processedFiles / job.totalFiles) * 100));
+}
+
+function highlightStep(job: AiVideoJob | null | undefined) {
+  if (!job || job.status === "COMPLETED") return HIGHLIGHT_STEPS.length;
+  if (job.status === "FAILED") return 0;
+  const clips = job.processedClips ?? 0;
+  const total = Math.max(1, job.clipCount || 1);
+  if (clips <= 0) return 0;
+  if (clips < total) return 1;
+  return 2;
+}
+
 export default function ProjectAiPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -29,7 +51,7 @@ export default function ProjectAiPage() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [makingVideo, setMakingVideo] = useState(false);
-  const [progressStep, setProgressStep] = useState(0);
+  const [trackedVideoId, setTrackedVideoId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [justCompletedVideoId, setJustCompletedVideoId] = useState<number | null>(null);
@@ -46,9 +68,60 @@ export default function ProjectAiPage() {
       return;
     }
     load()
+      .then((dash) => {
+        if (isActive(dash?.latestJob?.status)) setRunning(true);
+        if (isActive(dash?.latestVideoJob?.status)) {
+          setMakingVideo(true);
+          setTrackedVideoId(dash?.latestVideoJob?.id ?? null);
+        }
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "조회 실패"))
       .finally(() => setLoading(false));
   }, [params.id, router]);
+
+  useEffect(() => {
+    if (!running && !makingVideo) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const dash = await load();
+          if (cancelled || !dash) return;
+
+          if (running) {
+            const status = dash.latestJob?.status;
+            if (status === "COMPLETED") {
+              setRunning(false);
+              setMessage("AI 분석이 완료되었습니다.");
+            } else if (status === "FAILED") {
+              setRunning(false);
+              setError(dash.latestJob?.errorMessage ?? "분석 실패");
+            }
+          }
+
+          if (makingVideo) {
+            const video = dash.latestVideoJob;
+            if (trackedVideoId != null && video?.id !== trackedVideoId) return;
+            if (video?.status === "COMPLETED") {
+              setMakingVideo(false);
+              setJustCompletedVideoId(video.id);
+              const driveNote = video.driveSynced ? " Drive에도 저장했습니다." : "";
+              setMessage("하이라이트 영상 생성이 완료되었습니다." + driveNote);
+            } else if (video?.status === "FAILED") {
+              setMakingVideo(false);
+              setError(video.errorMessage ?? "영상 생성 실패");
+            }
+          }
+        } catch {
+          // keep polling
+        }
+      })();
+    }, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [running, makingVideo, trackedVideoId, params.id]);
 
   useEffect(() => {
     if (!data?.results?.length) return;
@@ -77,7 +150,7 @@ export default function ProjectAiPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.latestJob?.id]);
+  }, [data?.latestJob?.id, data?.latestJob?.status]);
 
   useEffect(() => {
     const path = data?.latestVideoJob?.contentPath;
@@ -102,20 +175,6 @@ export default function ProjectAiPage() {
     };
   }, [data?.latestVideoJob?.id, data?.latestVideoJob?.status, data?.latestVideoJob?.contentPath]);
 
-  useEffect(() => {
-    if (!makingVideo) {
-      setProgressStep(0);
-      return;
-    }
-    setProgressStep(0);
-    const timers = [
-      window.setTimeout(() => setProgressStep(1), 800),
-      window.setTimeout(() => setProgressStep(2), 2800),
-      window.setTimeout(() => setProgressStep(3), 5000),
-    ];
-    return () => timers.forEach((id) => window.clearTimeout(id));
-  }, [makingVideo]);
-
   async function runAnalyze() {
     setRunning(true);
     setError(null);
@@ -125,11 +184,10 @@ export default function ProjectAiPage() {
         method: "POST",
       });
       setData(res.data);
-      setMessage(res.message ?? "AI 분석이 완료되었습니다.");
+      setMessage(res.message ?? "AI 분석을 시작했습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "분석 실패");
-    } finally {
       setRunning(false);
+      setError(err instanceof Error ? err.message : "분석 실패");
     }
   }
 
@@ -150,21 +208,16 @@ export default function ProjectAiPage() {
       const res = await apiFetch<AiVideoJob>(`/api/projects/${params.id}/ai/video`, {
         method: "POST",
       });
-      setProgressStep(HIGHLIGHT_STEPS.length - 1);
+      setTrackedVideoId(res.data?.id ?? null);
       const dash = await load();
       if (dash) {
         setData({ ...dash, latestVideoJob: res.data ?? dash.latestVideoJob });
       }
-      const jobId = res.data?.id ?? null;
-      if (jobId != null) setJustCompletedVideoId(jobId);
-      const driveNote = res.data?.driveSynced ? " Drive에도 저장했습니다." : "";
-      setMessage(
-        (res.message ?? "하이라이트 영상 생성이 완료되었습니다.") + driveNote,
-      );
+      setMessage(res.message ?? "하이라이트 영상 생성을 시작했습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "영상 생성 실패");
-    } finally {
       setMakingVideo(false);
+      setTrackedVideoId(null);
+      setError(err instanceof Error ? err.message : "영상 생성 실패");
     }
   }
 
@@ -178,6 +231,8 @@ export default function ProjectAiPage() {
 
   const grouped = groupByScene(data?.results ?? []);
   const hasCompletedVideo = data?.latestVideoJob?.status === "COMPLETED";
+  const progressStep = highlightStep(data?.latestVideoJob);
+  const analyzePct = analysisPercent(data?.latestJob ?? null);
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-10 sm:py-14">
@@ -235,6 +290,21 @@ export default function ProjectAiPage() {
           </div>
         )}
 
+      {running && data?.latestJob && (
+        <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <p className="mb-2 text-sm font-medium">분석 진행 {analyzePct}%</p>
+          <div className="h-2 overflow-hidden rounded-full bg-accent/10">
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${analyzePct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {data.latestJob.processedFiles}/{data.latestJob.totalFiles} 파일 처리 중
+          </p>
+        </div>
+      )}
+
       {makingVideo && (
         <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
           <p className="mb-3 text-sm font-medium">영상 생성 진행</p>
@@ -256,12 +326,15 @@ export default function ProjectAiPage() {
                   {done ? "✓ " : current ? "→ " : "· "}
                   {label}
                   {current ? "…" : ""}
+                  {index === 1 && data?.latestVideoJob
+                    ? ` (${data.latestVideoJob.processedClips ?? 0}/${data.latestVideoJob.clipCount || 0})`
+                    : ""}
                 </li>
               );
             })}
           </ol>
           <p className="mt-3 text-xs text-muted">
-            생성 중에는 다시 요청할 수 없습니다. 완료까지 잠시 기다려 주세요.
+            서버에서 비동기로 생성 중입니다. 완료까지 잠시 기다려 주세요.
           </p>
         </div>
       )}

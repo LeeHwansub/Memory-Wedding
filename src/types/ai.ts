@@ -53,6 +53,7 @@ export type AiVideoJob = {
   id: number;
   status: AiJobStatus;
   clipCount: number;
+  processedClips?: number;
   fileSize?: number | null;
   contentPath?: string | null;
   driveFileId?: string | null;

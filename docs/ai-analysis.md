@@ -1,6 +1,6 @@
 # AI 분석 (장면 분류 · Best Shot · 하이라이트)
 
-> 기준 브랜치: `dev` (PR #9~#14 merge)  
+> 기준 브랜치: `dev` (PR #9~#15 + NFR-003 1차)  
 > 참조: [Notion 요구사항](https://chip-sail-0e6.notion.site/Memory-Wedding-38f14c71cd4f806abfedef0e05f55306) · `docs/requirements-spec.md` FR-AI-001~018
 
 ## 1. 개요
@@ -22,11 +22,12 @@
 | FR-AI-005 | Best Shot 선정 | ✅ | confidence 임계값 이상만 |
 | FR-AI-006 | 하이라이트 영상 생성 | ✅ 1차 | Best Shot **PHOTO** 슬라이드쇼 (Ken Burns) |
 | FR-AI-007 | Drive AI/Archive 저장 | ✅ 1차 | 하이라이트 MP4 best-effort |
-| FR-AI-008 | 생성 진행 상태 | ✅ 1차 | FE 단계 UI + Job status. **실 퍼센트·Queue는 NFR-003** |
+| FR-AI-008 | 생성 진행 상태 | ✅ 1차 | **비동기 Job + FE 폴링** (`processedFiles` / `processedClips`). Redis Queue는 후속 |
 | FR-AI-009 | 생성 완료 안내 | ✅ 1차 | 페이지 내 배너·메시지. 푸시/메일은 후속 |
 | FR-AI-010 | 영상 재생성 | ✅ | 확인 다이얼로그 + 새 Job. 생성 중 중복 차단 |
 | FR-AI-011 | 분석 결과 조회 | ✅ | 대시보드 장면·Best Shot |
 | FR-AI-012~018 | BGM·자막·스타일·길이·중복·감정·인물 | ❌ | 후속 |
+| NFR-003 | 비동기 AI 처리 | ✅ 1차 | 인메모리 `@Async` 스레드 풀 (외부 Broker 없음) |
 
 ## 3. 장면 카테고리 (FR-AI-004)
 
@@ -80,10 +81,13 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/api/projects/{id}/ai` | 최근 분석 Job + 결과 + Best Shot + 하이라이트 Job |
-| POST | `/api/projects/{id}/ai/analyze` | 사진·영상 분석 (**동기**) |
+| POST | `/api/projects/{id}/ai/analyze` | 사진·영상 분석 (**비동기** — Job 즉시 반환) |
 | GET | `/api/projects/{id}/ai/video` | 최근 하이라이트 Job |
-| POST | `/api/projects/{id}/ai/video` | 하이라이트 MP4 생성 (**동기**) + Drive best-effort |
+| POST | `/api/projects/{id}/ai/video` | 하이라이트 MP4 생성 (**비동기**) + Drive best-effort |
 | GET | `/api/projects/{id}/ai/video/{jobId}/content` | 생성된 MP4 스트리밍 |
+
+> POST는 Job을 `PROCESSING`으로 만들고 즉시 응답한다. 워커(`aiTaskExecutor`)가 처리하며, FE는 `GET /ai`를 폴링한다.
+> 분석 진행: `processedFiles / totalFiles` · 하이라이트: `processedClips / clipCount`
 
 설정:
 
@@ -120,11 +124,16 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 
 | FR | 구현 |
 |----|------|
-| FR-AI-008 | 생성 중 단계 UI (Best Shot → 렌더 → 합성 → Drive). PENDING/PROCESSING 중복 요청 차단 |
+| FR-AI-008 | 생성 중 단계 UI + **서버 진행 카운터 폴링** + PENDING/PROCESSING 중복 요청 차단 |
 | FR-AI-009 | 완료 메시지 + 페이지 내 배너 |
 | FR-AI-010 | 「하이라이트 다시 생성」확인 후 새 Job |
 
-> 생성은 **동기 API**. 단계 UI는 대기 UX용. 서버 퍼센트·비동기 Queue는 **NFR-003** 후속.
+### 비동기 Queue (NFR-003 1차)
+
+- `@EnableAsync` + `aiTaskExecutor` (core 2 / max 4)
+- 커밋 후 `AiAsyncDispatcher`가 분석·하이라이트 워커 실행
+- 파일/클립 단위 `REQUIRES_NEW`로 진행률 커밋 → 폴링에 반영
+- 외부 Redis/Kafka Queue는 후속
 
 ## 9. Docker
 
@@ -142,7 +151,7 @@ Gemini env는 `docker-compose.yml` / `.env`로 전달. AI·ffmpeg 변경 후: `d
 
 ## 11. 후속 (우선순위 제안)
 
-1. **NFR-003** — 비동기 Queue + 실 진행률 (008 고도화)
+1. Redis 등 외부 Queue · 재시도/데드레터 (NFR-003 고도화)
 2. 하이라이트에 **영상 클립** 포함
 3. **FR-AI-012~015** — BGM · 자막 · 스타일 · 길이
 4. FR-AI-009 푸시/메일 · FR-AI-016~018

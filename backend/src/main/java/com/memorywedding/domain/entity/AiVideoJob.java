@@ -54,6 +54,10 @@ public class AiVideoJob extends BaseTimeEntity {
     @Column(nullable = false)
     private int clipCount;
 
+    /** Prepared image clips so far (progress while PROCESSING). */
+    @Column(nullable = false)
+    private int processedClips;
+
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -67,17 +71,23 @@ public class AiVideoJob extends BaseTimeEntity {
         this.requestedBy = requestedBy;
         this.status = AiJobStatus.PENDING;
         this.clipCount = 0;
+        this.processedClips = 0;
     }
 
     public void markProcessing(int clipCount) {
         this.status = AiJobStatus.PROCESSING;
         this.clipCount = clipCount;
+        this.processedClips = 0;
         this.startedAt = LocalDateTime.now();
         this.errorMessage = null;
         this.driveFileId = null;
         this.storageKey = null;
         this.storageProvider = null;
         this.fileSize = null;
+    }
+
+    public void incrementProcessedClips() {
+        this.processedClips += 1;
     }
 
     public void markCompleted(String storageProvider, String storageKey, long fileSize) {
