@@ -216,6 +216,11 @@ export default function ProjectAiPage() {
             {data.latestVideoJob.fileSize
               ? ` · ${(data.latestVideoJob.fileSize / (1024 * 1024)).toFixed(1)} MB`
               : ""}
+            {data.latestVideoJob.driveSynced
+              ? " · Drive AI/Archive 저장됨"
+              : data.latestVideoJob.status === "COMPLETED"
+                ? " · Drive 미연동 또는 업로드 대기"
+                : ""}
           </p>
           {data.latestVideoJob.errorMessage && (
             <p className="mb-2 text-sm text-red-600">{data.latestVideoJob.errorMessage}</p>
@@ -231,7 +236,7 @@ export default function ProjectAiPage() {
             <p className="text-sm text-muted">영상 로딩 중...</p>
           ) : null}
           <p className="mt-2 text-xs text-muted">
-            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 저장은 후속(FR-AI-007).
+            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 연결 시 AI/·Archive/에 함께 저장됩니다.
           </p>
         </section>
       )}
