@@ -46,6 +46,19 @@ export type AiDashboard = {
   analyzerMode: "gemini" | "mock" | string;
   minConfidence: number;
   excludedCount: number;
+  latestVideoJob?: AiVideoJob | null;
+};
+
+export type AiVideoJob = {
+  id: number;
+  status: AiJobStatus;
+  clipCount: number;
+  fileSize?: number | null;
+  contentPath?: string | null;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
 };
 
 export const SCENE_LABELS: Record<SceneCategory, string> = {

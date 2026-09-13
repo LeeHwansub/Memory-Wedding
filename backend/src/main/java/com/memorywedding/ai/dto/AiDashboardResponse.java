@@ -8,6 +8,7 @@ public record AiDashboardResponse(
         List<AiPhotoResultResponse> bestShots,
         String analyzerMode,
         double minConfidence,
-        int excludedCount
+        int excludedCount,
+        AiVideoJobResponse latestVideoJob
 ) {
 }
