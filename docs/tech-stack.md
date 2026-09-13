@@ -69,8 +69,8 @@ Memory-Wedding/
 | Naver OAuth 2.0 | OAuth 2.0 | 로그인 | ✅ |
 | Kakao OAuth 2.0 | OAuth 2.0 | 로그인 | ✅ |
 | Google Drive API | v3 | 파일 저장 | ✅ |
-| Gemini API | 2.x | AI 분석 | ❌ |
-| FFmpeg | 7.x | 영상 합성 | ❌ |
+| Gemini API | 2.5 Flash | 장면 분류 · Best Shot | ✅ 1차 (`docs/ai-analysis.md`) |
+| FFmpeg | (backend 이미지) | 프레임 추출 · 하이라이트 합성 | ✅ 1차 |
 
 ---
 
