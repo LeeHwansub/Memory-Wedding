@@ -24,4 +24,10 @@ public class GeminiProperties {
      * Below this threshold the photo is excluded from classification UI (original stays in Drive Photos).
      */
     private double minConfidence = 0.60;
+
+    /** Max videos analyzed per job. */
+    private int maxVideos = 5;
+
+    /** Frames extracted per video (evenly spaced). */
+    private int videoFrames = 5;
 }

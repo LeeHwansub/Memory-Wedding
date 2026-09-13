@@ -18,6 +18,8 @@ app:
     model: ${GEMINI_MODEL:gemini-2.5-flash}
     max-photos: ${GEMINI_MAX_PHOTOS:20}
     min-confidence: ${GEMINI_MIN_CONFIDENCE:0.60}
+    max-videos: ${GEMINI_MAX_VIDEOS:5}
+    video-frames: ${GEMINI_VIDEO_FRAMES:5}
   jwt:
     secret: change-me-in-production-use-long-random-string-at-least-32-chars
     expiration-ms: 86400000

@@ -54,6 +54,8 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       GEMINI_MAX_PHOTOS: ${GEMINI_MAX_PHOTOS:-20}
       GEMINI_MIN_CONFIDENCE: ${GEMINI_MIN_CONFIDENCE:-0.60}
+      GEMINI_MAX_VIDEOS: ${GEMINI_MAX_VIDEOS:-5}
+      GEMINI_VIDEO_FRAMES: ${GEMINI_VIDEO_FRAMES:-5}
     volumes:
       - upload_data:/app/data/uploads
       - ${GCS_CREDENTIALS_HOST_PATH:-./secrets}:/secrets:ro

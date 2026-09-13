@@ -165,9 +165,9 @@
 ### MVP 이후 / 진행 중
 
 - ~~청첩장 템플릿~~ (구현 완료)
-- Gemini AI 사진 분석·장면 분류·Best Shot (1차 구현 중, `docs/ai-analysis.md`)
+- Gemini AI 사진 분석·장면 분류·Best Shot (1차 완료, `docs/ai-analysis.md`)
+- ~~동영상 AI 분석 (FR-AI-003)~~ (1차 완료 — 프레임 추출·장면 집계)
 - FFmpeg 하이라이트 영상 생성 (FR-AI-006~010)
-- 동영상 AI 분석 (FR-AI-003)
 - 방명록 수정
 - Drive 용량 대시보드
 - 서비스 통계

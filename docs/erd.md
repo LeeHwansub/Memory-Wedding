@@ -339,20 +339,21 @@ erDiagram
 
 ---
 
-### 3.10 ai_photo_result (MVP 이후)
+### 3.10 ai_photo_result (1차 · PHOTO/VIDEO 공통)
 
 | 컬럼 | 타입 | Null | Key | 설명 |
 |------|------|------|-----|------|
 | id | BIGINT | NO | PK | Auto Increment |
 | job_id | BIGINT | NO | FK | AI 분석 Job |
-| upload_file_id | BIGINT | NO | FK, UK | 분석 대상 파일 (1:1) |
+| upload_file_id | BIGINT | NO | FK, UK | 분석 대상 파일 (PHOTO 또는 VIDEO, 1:1) |
 | scene_category | ENUM('ENTRANCE','SONG','GROUP_PHOTO','RECEPTION','OTHER') | NO | | 장면 분류 (Notion FR-AI-004) |
 | is_best_shot | BOOLEAN | NO | | Best Shot 여부 |
 | confidence | DECIMAL(5,4) | YES | | AI 신뢰도 |
-| metadata | JSON | YES | | 추가 분석 Metadata |
+| metadata | JSON | YES | | 인물·객체·장소, VIDEO 시 frameCount/frameScenes |
 | analyzed_at | DATETIME | NO | | 분석일 |
 
-**FK:** `job_id` → `ai_analysis_job(id)`, `upload_file_id` → `upload_file(id)`
+**FK:** `job_id` → `ai_analysis_job(id)`, `upload_file_id` → `upload_file(id)`  
+VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 
 ---
 

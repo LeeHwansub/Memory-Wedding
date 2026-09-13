@@ -8,6 +8,8 @@ export type SceneCategory =
   | "RECEPTION"
   | "OTHER";
 
+export type AiMediaFileType = "PHOTO" | "VIDEO";
+
 export type AiJob = {
   id: number;
   status: AiJobStatus;
@@ -26,12 +28,14 @@ export type AiPhotoResult = {
   originalFilename: string;
   guestName: string;
   contentPath: string;
+  fileType?: AiMediaFileType;
   sceneCategory: SceneCategory;
   bestShot: boolean;
   confidence?: number | null;
   people?: string[];
   objects?: string[];
   place?: string | null;
+  frameCount?: number | null;
   analyzedAt?: string | null;
 };
 
@@ -51,3 +55,9 @@ export const SCENE_LABELS: Record<SceneCategory, string> = {
   RECEPTION: "피로연",
   OTHER: "기타",
 };
+
+export function isVideoResult(item: AiPhotoResult): boolean {
+  if (item.fileType === "VIDEO") return true;
+  if (item.fileType === "PHOTO") return false;
+  return (item.frameCount ?? null) !== null;
+}
