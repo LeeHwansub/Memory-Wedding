@@ -14,6 +14,7 @@ import com.memorywedding.domain.entity.AiPhotoResult;
 import com.memorywedding.domain.entity.Member;
 import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
+import com.memorywedding.domain.enums.AiJobStatus;
 import com.memorywedding.domain.enums.FileType;
 import com.memorywedding.domain.enums.SceneCategory;
 import com.memorywedding.domain.enums.UploadStatus;
@@ -36,6 +37,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -52,6 +55,9 @@ public class AiAnalysisService {
     private final VideoFrameExtractor videoFrameExtractor;
     private final AiVideoJobRepository aiVideoJobRepository;
     private final AiHighlightService aiHighlightService;
+    private final AiAsyncDispatcher aiAsyncDispatcher;
+    private final AiJobProgressService aiJobProgressService;
+    private final AiAnalysisWriteService aiAnalysisWriteService;
     private final GeminiProperties geminiProperties;
     private final ObjectMapper objectMapper;
 
@@ -61,80 +67,83 @@ public class AiAnalysisService {
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
                 .orElseThrow(() -> new NotFoundException("Member not found"));
 
-        List<UploadFile> photos = uploadFileRepository
-                .findByProject_IdAndFileTypeAndUploadStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
-                        projectId, FileType.PHOTO, UploadStatus.COMPLETED);
-        List<UploadFile> videos = uploadFileRepository
-                .findByProject_IdAndFileTypeAndUploadStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
-                        projectId, FileType.VIDEO, UploadStatus.COMPLETED);
-
-        int photoLimit = Math.max(1, geminiProperties.getMaxPhotos());
-        int videoLimit = Math.max(0, geminiProperties.getMaxVideos());
-        List<UploadFile> photoTargets =
-                photos.size() > photoLimit ? photos.subList(0, photoLimit) : photos;
-        List<UploadFile> videoTargets =
-                videos.size() > videoLimit ? videos.subList(0, videoLimit) : videos;
-
-        if (photoTargets.isEmpty() && videoTargets.isEmpty()) {
-            throw new BadRequestException("분석할 완료된 사진·영상이 없습니다. 하객 업로드 후 다시 시도해 주세요.");
+        if (aiAnalysisJobRepository.existsByProject_IdAndStatusIn(
+                projectId, List.of(AiJobStatus.PENDING, AiJobStatus.PROCESSING))) {
+            throw new BadRequestException("이미 AI 분석을 실행 중입니다. 완료 후 다시 시도해 주세요.");
         }
 
-        List<UploadFile> targets = new ArrayList<>(photoTargets.size() + videoTargets.size());
-        targets.addAll(photoTargets);
-        targets.addAll(videoTargets);
+        List<UploadFile> targets = aiAnalysisWriteService.resolveTargets(projectId);
+        if (targets.isEmpty()) {
+            throw new BadRequestException("분석할 완료된 사진·영상이 없습니다. 하객 업로드 후 다시 시도해 주세요.");
+        }
 
         AiAnalysisJob job = aiAnalysisJobRepository.save(
                 AiAnalysisJob.builder().project(project).requestedBy(member).build());
         job.markProcessing(targets.size());
+        aiAnalysisJobRepository.save(job);
 
-        List<AiPhotoResult> draft = new ArrayList<>();
-        int index = 0;
-        for (UploadFile file : targets) {
-            try {
-                if (file.getFileType() == FileType.VIDEO) {
-                    analyzeVideo(job, file, index, draft);
-                } else {
-                    analyzePhoto(job, file, index, draft);
-                }
-                job.incrementProcessed();
-            } catch (Exception e) {
-                log.warn("Skip AI for upload {}: {}", file.getId(), e.getMessage());
+        Long jobId = job.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                aiAsyncDispatcher.runAnalysis(jobId);
             }
-            index += 1;
-        }
-
-        markBestShots(draft);
-        draft.forEach(aiPhotoResultRepository::save);
-
-        if (job.getProcessedFiles() == 0) {
-            job.markFailed("분석에 성공한 사진·영상이 없습니다.");
-        } else {
-            job.markCompleted();
-        }
+        });
 
         return toDashboard(projectId, job);
     }
 
-    private void analyzePhoto(AiAnalysisJob job, UploadFile file, int index, List<AiPhotoResult> draft)
-            throws Exception {
+    public void processAnalysisJob(Long jobId) {
+        try {
+            Long projectId = aiAnalysisWriteService.requireProjectId(jobId);
+            List<UploadFile> targets = aiAnalysisWriteService.resolveTargets(projectId);
+            if (targets.isEmpty()) {
+                aiJobProgressService.markAnalysisFailed(jobId, "분석할 완료된 사진·영상이 없습니다.");
+                return;
+            }
+
+            int index = 0;
+            for (UploadFile file : targets) {
+                try {
+                    if (file.getFileType() == FileType.VIDEO) {
+                        analyzeVideo(jobId, file, index);
+                    } else {
+                        analyzePhoto(jobId, file, index);
+                    }
+                    aiJobProgressService.bumpAnalysisProcessed(jobId);
+                } catch (Exception e) {
+                    log.warn("Skip AI for upload {}: {}", file.getId(), e.getMessage());
+                }
+                index += 1;
+            }
+
+            aiAnalysisWriteService.finalizeAnalysis(jobId);
+        } catch (Exception e) {
+            log.warn("AI analysis job {} failed: {}", jobId, e.getMessage());
+            aiJobProgressService.markAnalysisFailed(
+                    jobId, e.getMessage() == null ? "AI 분석 실패" : e.getMessage());
+        }
+    }
+
+    private void analyzePhoto(Long jobId, UploadFile file, int index) throws Exception {
         byte[] bytes = readBytes(file);
         PhotoSceneAnalyzer.Analysis analysis = photoSceneAnalyzer.analyze(
                 bytes, file.getMimeType(), file.getOriginalFilename(), index);
         String metadata = buildMetadataJson(analysis, null, null);
-        draft.add(saveResult(job, file, analysis.category(), analysis.confidence(), metadata));
+        aiAnalysisWriteService.saveResult(
+                jobId, file, analysis.category(), analysis.confidence(), metadata);
     }
 
-    private void analyzeVideo(AiAnalysisJob job, UploadFile file, int index, List<AiPhotoResult> draft)
-            throws Exception {
+    private void analyzeVideo(Long jobId, UploadFile file, int index) throws Exception {
         byte[] videoBytes = readBytes(file);
         int frameTarget = Math.max(1, geminiProperties.getVideoFrames());
         List<byte[]> frames = videoFrameExtractor.extractFrames(videoBytes, frameTarget);
         if (frames.isEmpty()) {
-            // FFmpeg 없거나 실패 시 mock 한 장 분량으로 폴백 (파일명 기반)
             PhotoSceneAnalyzer.Analysis fallback = photoSceneAnalyzer.analyze(
                     new byte[0], "image/jpeg", file.getOriginalFilename(), index);
             String metadata = buildMetadataJson(fallback, 0, List.of());
-            draft.add(saveResult(job, file, fallback.category(), fallback.confidence(), metadata));
+            aiAnalysisWriteService.saveResult(
+                    jobId, file, fallback.category(), fallback.confidence(), metadata);
             return;
         }
 
@@ -155,8 +164,8 @@ public class AiAnalysisService {
 
         AggregatedVideoAnalysis aggregated = aggregateVideoFrames(frameAnalyses);
         String metadata = buildMetadataJson(aggregated.representative(), frames.size(), frameScenes);
-        draft.add(saveResult(
-                job, file, aggregated.category(), aggregated.confidence(), metadata));
+        aiAnalysisWriteService.saveResult(
+                jobId, file, aggregated.category(), aggregated.confidence(), metadata);
     }
 
     private AggregatedVideoAnalysis aggregateVideoFrames(List<PhotoSceneAnalyzer.Analysis> frames) {
@@ -187,28 +196,6 @@ public class AiAnalysisService {
                 frames.get(0));
         BigDecimal confidence = maxConfidence.getOrDefault(winner, BigDecimal.valueOf(0.5));
         return new AggregatedVideoAnalysis(winner, confidence, representative);
-    }
-
-    private AiPhotoResult saveResult(
-            AiAnalysisJob job,
-            UploadFile file,
-            SceneCategory category,
-            BigDecimal confidence,
-            String metadata) {
-        AiPhotoResult result = aiPhotoResultRepository.findByUploadFile_Id(file.getId())
-                .map(existing -> {
-                    existing.rebind(job, category, false, confidence, metadata);
-                    return existing;
-                })
-                .orElseGet(() -> AiPhotoResult.builder()
-                        .job(job)
-                        .uploadFile(file)
-                        .sceneCategory(category)
-                        .bestShot(false)
-                        .confidence(confidence)
-                        .metadataJson(metadata)
-                        .build());
-        return aiPhotoResultRepository.save(result);
     }
 
     @Transactional(readOnly = true)
@@ -250,30 +237,6 @@ public class AiAnalysisService {
                 minConfidence,
                 excludedCount,
                 latestVideo);
-    }
-
-    private void markBestShots(List<AiPhotoResult> results) {
-        Map<SceneCategory, List<AiPhotoResult>> byScene = new EnumMap<>(SceneCategory.class);
-        for (AiPhotoResult result : results) {
-            result.clearBestShot();
-            if (!meetsConfidence(result)) {
-                continue;
-            }
-            byScene.computeIfAbsent(result.getSceneCategory(), key -> new ArrayList<>()).add(result);
-        }
-        for (List<AiPhotoResult> group : byScene.values()) {
-            group.stream()
-                    .max(Comparator.comparing(
-                            (AiPhotoResult r) -> r.getConfidence() == null
-                                    ? BigDecimal.ZERO
-                                    : r.getConfidence()))
-                    .ifPresent(AiPhotoResult::markBestShot);
-        }
-    }
-
-    private boolean meetsConfidence(AiPhotoResult result) {
-        BigDecimal min = BigDecimal.valueOf(geminiProperties.getMinConfidence());
-        return result.getConfidence() != null && result.getConfidence().compareTo(min) >= 0;
     }
 
     private boolean meetsConfidence(AiPhotoResultResponse result) {

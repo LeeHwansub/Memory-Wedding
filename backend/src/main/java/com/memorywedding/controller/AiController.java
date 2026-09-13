@@ -40,7 +40,7 @@ public class AiController {
         Long memberId = (Long) authentication.getPrincipal();
         return ApiResponse.ok(
                 aiAnalysisService.startAnalysis(memberId, projectId),
-                "AI 분석이 완료되었습니다.");
+                "AI 분석을 시작했습니다. 잠시 후 결과가 갱신됩니다.");
     }
 
     @GetMapping("/api/projects/{projectId}/ai/video")
@@ -58,7 +58,7 @@ public class AiController {
         Long memberId = (Long) authentication.getPrincipal();
         return ApiResponse.ok(
                 aiHighlightService.createHighlight(memberId, projectId),
-                "하이라이트 영상 생성이 완료되었습니다.");
+                "하이라이트 영상 생성을 시작했습니다.");
     }
 
     @GetMapping("/api/projects/{projectId}/ai/video/{jobId}/content")

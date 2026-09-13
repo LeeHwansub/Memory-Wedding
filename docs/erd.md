@@ -370,6 +370,7 @@ VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 | storage_provider | VARCHAR(50) | YES | | local / gcs |
 | file_size | BIGINT | YES | | 바이트 |
 | clip_count | INT | NO | | 사용한 Best Shot 수 |
+| processed_clips | INT | NO | | 준비된 클립 수 (진행률) |
 | error_message | TEXT | YES | | 오류 메시지 |
 | started_at | DATETIME | YES | | 시작일 |
 | completed_at | DATETIME | YES | | 완료일 |

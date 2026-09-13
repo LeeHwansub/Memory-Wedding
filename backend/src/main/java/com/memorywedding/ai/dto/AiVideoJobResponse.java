@@ -7,6 +7,7 @@ public record AiVideoJobResponse(
         Long id,
         AiJobStatus status,
         int clipCount,
+        int processedClips,
         Long fileSize,
         String contentPath,
         String driveFileId,

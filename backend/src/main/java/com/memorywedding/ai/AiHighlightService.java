@@ -1,29 +1,22 @@
 package com.memorywedding.ai;
 
-import com.memorywedding.ai.dto.AiDashboardResponse;
 import com.memorywedding.ai.dto.AiVideoJobResponse;
 import com.memorywedding.common.BadRequestException;
 import com.memorywedding.common.ForbiddenException;
 import com.memorywedding.common.NotFoundException;
-import com.memorywedding.config.GeminiProperties;
-import com.memorywedding.domain.entity.AiAnalysisJob;
 import com.memorywedding.domain.entity.AiPhotoResult;
 import com.memorywedding.domain.entity.AiVideoJob;
 import com.memorywedding.domain.entity.Member;
 import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.AiJobStatus;
-import com.memorywedding.domain.enums.FileType;
-import com.memorywedding.domain.repository.AiAnalysisJobRepository;
-import com.memorywedding.domain.repository.AiPhotoResultRepository;
 import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
-import com.memorywedding.storage.ObjectStorage;
 import com.memorywedding.drive.DriveSyncService;
+import com.memorywedding.storage.ObjectStorage;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -34,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -44,13 +39,13 @@ public class AiHighlightService {
 
     private final WeddingProjectRepository weddingProjectRepository;
     private final MemberRepository memberRepository;
-    private final AiAnalysisJobRepository aiAnalysisJobRepository;
-    private final AiPhotoResultRepository aiPhotoResultRepository;
     private final AiVideoJobRepository aiVideoJobRepository;
     private final ObjectStorage objectStorage;
     private final HighlightVideoComposer highlightVideoComposer;
     private final DriveSyncService driveSyncService;
-    private final GeminiProperties geminiProperties;
+    private final AiAsyncDispatcher aiAsyncDispatcher;
+    private final AiJobProgressService aiJobProgressService;
+    private final AiHighlightWriteService aiHighlightWriteService;
 
     @Transactional
     public AiVideoJobResponse createHighlight(Long memberId, Long projectId) {
@@ -67,25 +62,7 @@ public class AiHighlightService {
             throw new BadRequestException("이미 하이라이트 영상을 생성 중입니다. 완료 후 다시 시도해 주세요.");
         }
 
-        AiAnalysisJob analysis = aiAnalysisJobRepository
-                .findFirstByProject_IdOrderByCreatedAtDesc(projectId)
-                .orElseThrow(() -> new BadRequestException("먼저 AI 분석을 실행해 주세요."));
-
-        List<AiPhotoResult> bestPhotos = aiPhotoResultRepository
-                .findByJob_IdOrderBySceneCategoryAscIdAsc(analysis.getId())
-                .stream()
-                .filter(AiPhotoResult::isBestShot)
-                .filter(this::meetsConfidence)
-                .filter(r -> r.getUploadFile().getFileType() == FileType.PHOTO)
-                .sorted(Comparator
-                        .comparingInt((AiPhotoResult r) -> r.getSceneCategory().ordinal())
-                        .thenComparing(
-                                (AiPhotoResult r) -> r.getConfidence() == null
-                                        ? BigDecimal.ZERO
-                                        : r.getConfidence(),
-                                Comparator.reverseOrder()))
-                .toList();
-
+        List<AiPhotoResult> bestPhotos = aiHighlightWriteService.loadBestPhotos(projectId);
         if (bestPhotos.isEmpty()) {
             throw new BadRequestException(
                     "하이라이트에 쓸 Best Shot 사진이 없습니다. AI 분석 후 다시 시도해 주세요.");
@@ -94,9 +71,29 @@ public class AiHighlightService {
         AiVideoJob job = aiVideoJobRepository.save(
                 AiVideoJob.builder().project(project).requestedBy(member).build());
         job.markProcessing(bestPhotos.size());
+        aiVideoJobRepository.save(job);
 
+        Long jobId = job.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                aiAsyncDispatcher.runHighlight(jobId);
+            }
+        });
+
+        return toResponse(projectId, job);
+    }
+
+    public void processHighlightJob(Long jobId) {
         Path workDir = null;
         try {
+            Long projectId = aiHighlightWriteService.requireProjectId(jobId);
+            List<AiPhotoResult> bestPhotos = aiHighlightWriteService.loadBestPhotos(projectId);
+            if (bestPhotos.isEmpty()) {
+                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 사진이 없습니다.");
+                return;
+            }
+
             workDir = Files.createTempDirectory("mw-highlight-in-");
             List<Path> images = new ArrayList<>();
             int index = 0;
@@ -111,10 +108,11 @@ public class AiHighlightService {
                 Files.write(imagePath, bytes);
                 images.add(imagePath);
                 index += 1;
+                aiJobProgressService.bumpHighlightProcessed(jobId);
             }
             if (images.isEmpty()) {
-                job.markFailed("Best Shot 원본을 읽지 못했습니다.");
-                return toResponse(projectId, job);
+                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 원본을 읽지 못했습니다.");
+                return;
             }
 
             byte[] mp4 = highlightVideoComposer.composeSlideshow(images, SECONDS_PER_IMAGE);
@@ -124,10 +122,13 @@ public class AiHighlightService {
                     new ByteArrayInputStream(mp4),
                     mp4.length,
                     "video/mp4");
-            job.markCompleted(stored.provider(), stored.objectKey(), mp4.length);
+            aiJobProgressService.completeHighlight(
+                    jobId, stored.provider(), stored.objectKey(), mp4.length);
+            driveSyncService.syncHighlightBestEffort(jobId);
         } catch (Exception e) {
-            log.warn("Highlight video failed for project {}: {}", projectId, e.getMessage());
-            job.markFailed(e.getMessage() == null ? "하이라이트 영상 생성 실패" : e.getMessage());
+            log.warn("Highlight video job {} failed: {}", jobId, e.getMessage());
+            aiJobProgressService.markHighlightFailed(
+                    jobId, e.getMessage() == null ? "하이라이트 영상 생성 실패" : e.getMessage());
         } finally {
             if (workDir != null) {
                 try (var walk = Files.walk(workDir)) {
@@ -143,14 +144,6 @@ public class AiHighlightService {
                 }
             }
         }
-
-        AiVideoJob saved = aiVideoJobRepository.save(job);
-        if (saved.getStatus() == AiJobStatus.COMPLETED) {
-            driveSyncService.syncHighlightBestEffort(saved.getId());
-        }
-        return toResponse(
-                projectId,
-                aiVideoJobRepository.findById(saved.getId()).orElse(saved));
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +173,6 @@ public class AiHighlightService {
     }
 
     public AiVideoJobResponse toResponse(Long projectId, AiVideoJob job) {
-        // reload in case Drive sync updated driveFileId in another transaction
         AiVideoJob fresh = aiVideoJobRepository.findById(job.getId()).orElse(job);
         String contentPath = fresh.getStorageKey() != null && !fresh.getStorageKey().isBlank()
                 ? "/api/projects/" + projectId + "/ai/video/" + fresh.getId() + "/content"
@@ -190,6 +182,7 @@ public class AiHighlightService {
                 fresh.getId(),
                 fresh.getStatus(),
                 fresh.getClipCount(),
+                fresh.getProcessedClips(),
                 fresh.getFileSize(),
                 contentPath,
                 fresh.getDriveFileId(),
@@ -199,11 +192,6 @@ public class AiHighlightService {
                 fresh.getCompletedAt(),
                 fresh.getCreatedAt()
         );
-    }
-
-    private boolean meetsConfidence(AiPhotoResult result) {
-        BigDecimal min = BigDecimal.valueOf(geminiProperties.getMinConfidence());
-        return result.getConfidence() != null && result.getConfidence().compareTo(min) >= 0;
     }
 
     private byte[] readBytes(UploadFile file) {
