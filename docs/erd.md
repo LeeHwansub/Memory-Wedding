@@ -171,8 +171,8 @@ erDiagram
 | 6 | `upload_file` | 업로드 파일 Metadata | ✅ |
 | 7 | `guestbook_entry` | 방명록 | ✅ |
 | 8 | `drive_connection` | Google Drive OAuth 연동 | ✅ |
-| 9 | `ai_analysis_job` | AI 사진 분석 작업 | ❌ |
-| 10 | `ai_photo_result` | AI 장면 분류·Best Shot 결과 | ❌ |
+| 9 | `ai_analysis_job` | AI 사진 분석 작업 | ✅ (1차) |
+| 10 | `ai_photo_result` | AI 장면 분류·Best Shot 결과 | ✅ (1차) |
 | 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ❌ |
 
 ---
@@ -346,7 +346,7 @@ erDiagram
 | id | BIGINT | NO | PK | Auto Increment |
 | job_id | BIGINT | NO | FK | AI 분석 Job |
 | upload_file_id | BIGINT | NO | FK, UK | 분석 대상 파일 (1:1) |
-| scene_category | ENUM('GROOM_ENTRANCE','BRIDE_ENTRANCE','CEREMONY','GUEST','OTHER') | NO | | 장면 분류 |
+| scene_category | ENUM('ENTRANCE','SONG','GROUP_PHOTO','RECEPTION','OTHER') | NO | | 장면 분류 (Notion FR-AI-004) |
 | is_best_shot | BOOLEAN | NO | | Best Shot 여부 |
 | confidence | DECIMAL(5,4) | YES | | AI 신뢰도 |
 | metadata | JSON | YES | | 추가 분석 Metadata |

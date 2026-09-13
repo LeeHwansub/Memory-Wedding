@@ -5,6 +5,7 @@ export type ProjectNavKey =
   | "design"
   | "guestbook"
   | "gallery"
+  | "ai"
   | "share"
   | "preview";
 
@@ -26,6 +27,7 @@ export const PROJECT_NAV: ProjectNavItem[] = [
   },
   { key: "guestbook", label: "방명록", href: (id) => `/dashboard/projects/${id}/guestbook` },
   { key: "gallery", label: "갤러리", href: (id) => `/dashboard/projects/${id}/gallery` },
+  { key: "ai", label: "AI", href: (id) => `/dashboard/projects/${id}/ai` },
   { key: "share", label: "초대", href: (id) => `/dashboard/projects/${id}/share` },
   { key: "preview", label: "미리보기", action: "preview" },
 ];

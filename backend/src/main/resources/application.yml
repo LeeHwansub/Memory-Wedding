@@ -13,6 +13,10 @@ app:
   frontend-url: http://localhost:3000
   drive:
     redirect-uri: ${DRIVE_REDIRECT_URI:http://localhost:8080/api/drive/oauth/callback}
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    max-photos: ${GEMINI_MAX_PHOTOS:20}
   jwt:
     secret: change-me-in-production-use-long-random-string-at-least-32-chars
     expiration-ms: 86400000
