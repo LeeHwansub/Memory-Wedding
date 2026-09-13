@@ -151,6 +151,16 @@ export default function InvitationDesignPage() {
     mainFocalY,
   ]);
 
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
   async function handleSave(event?: FormEvent, options?: { silent?: boolean }) {
     event?.preventDefault();
     if (!invitation || savingRef.current) return;
@@ -320,8 +330,25 @@ export default function InvitationDesignPage() {
 
   function applyTemplate(nextId: InvitationTemplate) {
     const def = getInvitationTemplate(nextId);
+    if (
+      applyTemplatePresets &&
+      (galleryLayout !== def.presets.galleryLayout ||
+        mainPhotoPlacement !== def.presets.mainPhotoPlacement)
+    ) {
+      const ok = window.confirm(
+        `${def.name} 템플릿의 레이아웃 프리셋도 적용할까요?\n(메인 위치·갤러리 레이아웃 등이 바뀔 수 있습니다)`,
+      );
+      if (!ok) {
+        setTemplate(def.id);
+        setMessage(`${def.name} 색감만 적용되었습니다. (프리셋 미적용)`);
+        return;
+      }
+    }
     setTemplate(def.id);
-    if (!applyTemplatePresets) return;
+    if (!applyTemplatePresets) {
+      setMessage(`${def.name} 색감이 적용되었습니다.`);
+      return;
+    }
     setGalleryLayout(def.presets.galleryLayout);
     setGalleryColumns(def.presets.galleryColumns);
     setGalleryImageSize(def.presets.galleryImageSize);
@@ -329,6 +356,7 @@ export default function InvitationDesignPage() {
     setMainPhotoPlacement(def.presets.mainPhotoPlacement);
     setMainBrightness(def.presets.mainBrightness);
     setMainSaturation(def.presets.mainSaturation);
+    setMessage(`${def.name} 템플릿이 적용되었습니다.`);
   }
 
   function setFocalFromClick(

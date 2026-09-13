@@ -240,7 +240,7 @@ flowchart TD
     D --> E{"분석 대상\n있음?"}
     E -->|No| F["status: COMPLETED\n결과 없음 안내"]
     E -->|Yes| G["Gemini API 호출\n(사진별)"]
-    G --> H["장면 분류\n(GROOM/BRIDE/CEREMONY/GUEST/OTHER)"]
+    G --> H["장면 분류\n(ENTRANCE/SONG/GROUP_PHOTO/RECEPTION/OTHER)"]
     H --> I["Best Shot 선정"]
     I --> J["ai_photo_result INSERT"]
     J --> K{"모든 파일\n처리?"}
