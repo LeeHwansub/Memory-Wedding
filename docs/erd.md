@@ -173,7 +173,7 @@ erDiagram
 | 8 | `drive_connection` | Google Drive OAuth 연동 | ✅ |
 | 9 | `ai_analysis_job` | AI 사진 분석 작업 | ✅ (1차) |
 | 10 | `ai_photo_result` | AI 장면 분류·Best Shot 결과 | ✅ (1차) |
-| 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ✅ (1차, Drive 저장 제외) |
+| 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ✅ (1차 · Drive AI/Archive) |
 
 ---
 
@@ -365,7 +365,7 @@ VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 | project_id | BIGINT | NO | FK | Wedding Project |
 | requested_by | BIGINT | NO | FK → member.id | 요청자 |
 | status | ENUM('PENDING','PROCESSING','COMPLETED','FAILED') | NO | | 작업 상태 |
-| drive_file_id | VARCHAR(100) | YES | | Drive File ID (FR-AI-007) |
+| drive_file_id | VARCHAR(100) | YES | | Drive AI/ 파일 ID (Archive에도 동일 파일명 업로드) |
 | storage_key | VARCHAR(500) | YES | | ObjectStorage 키 (서버 보관) |
 | storage_provider | VARCHAR(50) | YES | | local / gcs |
 | file_size | BIGINT | YES | | 바이트 |

@@ -4,11 +4,13 @@ import com.google.api.services.drive.Drive;
 import com.memorywedding.common.BadRequestException;
 import com.memorywedding.common.ForbiddenException;
 import com.memorywedding.common.NotFoundException;
+import com.memorywedding.domain.entity.AiVideoJob;
 import com.memorywedding.domain.entity.DriveConnection;
 import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.FileType;
 import com.memorywedding.domain.enums.UploadStatus;
+import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.DriveConnectionRepository;
 import com.memorywedding.domain.repository.UploadFileRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
@@ -32,6 +34,7 @@ public class DriveSyncService {
     private final DriveConnectionRepository driveConnectionRepository;
     private final WeddingProjectRepository weddingProjectRepository;
     private final UploadFileRepository uploadFileRepository;
+    private final AiVideoJobRepository aiVideoJobRepository;
     private final ObjectStorage objectStorage;
     private final GoogleDriveClient googleDriveClient;
 
@@ -76,6 +79,53 @@ public class DriveSyncService {
             syncFile(ownerId, file.getProject().getId(), file.getId());
         } catch (Exception e) {
             log.warn("Drive sync skipped for upload {}: {}", uploadFileId, e.getMessage());
+        }
+    }
+
+    /** Best-effort: upload highlight MP4 to Drive AI/ and Archive/. Never fails highlight. */
+    @Transactional
+    public void syncHighlightBestEffort(Long videoJobId) {
+        try {
+            AiVideoJob job = aiVideoJobRepository.findById(videoJobId).orElse(null);
+            if (job == null || job.getStorageKey() == null || job.getStorageKey().isBlank()) {
+                return;
+            }
+            if (job.getDriveFileId() != null && !job.getDriveFileId().isBlank()) {
+                return;
+            }
+            Long ownerId = job.getProject().getOwner().getId();
+            if (!driveConnectionRepository.existsByMember_Id(ownerId)) {
+                log.info("Drive not connected; skip highlight upload for job {}", videoJobId);
+                return;
+            }
+
+            WeddingProject project = job.getProject();
+            DriveConnection connection = driveOAuthService.requireConnection(ownerId);
+            driveOAuthService.ensureAppRoot(connection);
+            Drive drive = googleDriveClient.drive(driveOAuthService.decryptRefreshToken(connection));
+
+            String projectFolderId = ensureProjectFolder(drive, connection, project);
+            String aiFolderId = googleDriveClient.findOrCreateFolder(drive, "AI", projectFolderId);
+            String archiveFolderId = googleDriveClient.findOrCreateFolder(drive, "Archive", projectFolderId);
+
+            String filename = "highlight-" + project.getSlug() + "-" + job.getId() + ".mp4";
+            long size = job.getFileSize() == null ? 0L : job.getFileSize();
+
+            String aiFileId;
+            try (InputStream in = objectStorage.open(job.getStorageKey())) {
+                aiFileId = googleDriveClient.uploadFile(
+                        drive, aiFolderId, filename, "video/mp4", in, size);
+            }
+            try (InputStream in = objectStorage.open(job.getStorageKey())) {
+                googleDriveClient.uploadFile(
+                        drive, archiveFolderId, filename, "video/mp4", in, size);
+            }
+
+            job.markDriveSynced(aiFileId);
+            aiVideoJobRepository.save(job);
+            log.info("Highlight job {} uploaded to Drive AI/ and Archive/ ({})", videoJobId, aiFileId);
+        } catch (Exception e) {
+            log.warn("Drive highlight sync skipped for job {}: {}", videoJobId, e.getMessage());
         }
     }
 

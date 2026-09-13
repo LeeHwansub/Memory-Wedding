@@ -55,6 +55,8 @@ export type AiVideoJob = {
   clipCount: number;
   fileSize?: number | null;
   contentPath?: string | null;
+  driveFileId?: string | null;
+  driveSynced?: boolean;
   errorMessage?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;

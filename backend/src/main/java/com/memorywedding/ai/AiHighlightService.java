@@ -12,6 +12,7 @@ import com.memorywedding.domain.entity.AiVideoJob;
 import com.memorywedding.domain.entity.Member;
 import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
+import com.memorywedding.domain.enums.AiJobStatus;
 import com.memorywedding.domain.enums.FileType;
 import com.memorywedding.domain.repository.AiAnalysisJobRepository;
 import com.memorywedding.domain.repository.AiPhotoResultRepository;
@@ -19,6 +20,7 @@ import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
 import com.memorywedding.storage.ObjectStorage;
+import com.memorywedding.drive.DriveSyncService;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -47,6 +49,7 @@ public class AiHighlightService {
     private final AiVideoJobRepository aiVideoJobRepository;
     private final ObjectStorage objectStorage;
     private final HighlightVideoComposer highlightVideoComposer;
+    private final DriveSyncService driveSyncService;
     private final GeminiProperties geminiProperties;
 
     @Transactional
@@ -136,7 +139,13 @@ public class AiHighlightService {
             }
         }
 
-        return toResponse(projectId, aiVideoJobRepository.save(job));
+        AiVideoJob saved = aiVideoJobRepository.save(job);
+        if (saved.getStatus() == AiJobStatus.COMPLETED) {
+            driveSyncService.syncHighlightBestEffort(saved.getId());
+        }
+        return toResponse(
+                projectId,
+                aiVideoJobRepository.findById(saved.getId()).orElse(saved));
     }
 
     @Transactional(readOnly = true)
@@ -166,19 +175,24 @@ public class AiHighlightService {
     }
 
     public AiVideoJobResponse toResponse(Long projectId, AiVideoJob job) {
-        String contentPath = job.getStorageKey() != null && !job.getStorageKey().isBlank()
-                ? "/api/projects/" + projectId + "/ai/video/" + job.getId() + "/content"
+        // reload in case Drive sync updated driveFileId in another transaction
+        AiVideoJob fresh = aiVideoJobRepository.findById(job.getId()).orElse(job);
+        String contentPath = fresh.getStorageKey() != null && !fresh.getStorageKey().isBlank()
+                ? "/api/projects/" + projectId + "/ai/video/" + fresh.getId() + "/content"
                 : null;
+        boolean driveSynced = fresh.getDriveFileId() != null && !fresh.getDriveFileId().isBlank();
         return new AiVideoJobResponse(
-                job.getId(),
-                job.getStatus(),
-                job.getClipCount(),
-                job.getFileSize(),
+                fresh.getId(),
+                fresh.getStatus(),
+                fresh.getClipCount(),
+                fresh.getFileSize(),
                 contentPath,
-                job.getErrorMessage(),
-                job.getStartedAt(),
-                job.getCompletedAt(),
-                job.getCreatedAt()
+                fresh.getDriveFileId(),
+                driveSynced,
+                fresh.getErrorMessage(),
+                fresh.getStartedAt(),
+                fresh.getCompletedAt(),
+                fresh.getCreatedAt()
         );
     }
 

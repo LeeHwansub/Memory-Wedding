@@ -9,6 +9,8 @@ public record AiVideoJobResponse(
         int clipCount,
         Long fileSize,
         String contentPath,
+        String driveFileId,
+        boolean driveSynced,
         String errorMessage,
         LocalDateTime startedAt,
         LocalDateTime completedAt,

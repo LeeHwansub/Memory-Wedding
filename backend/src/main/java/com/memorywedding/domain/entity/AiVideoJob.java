@@ -88,6 +88,10 @@ public class AiVideoJob extends BaseTimeEntity {
         this.completedAt = LocalDateTime.now();
     }
 
+    public void markDriveSynced(String driveFileId) {
+        this.driveFileId = driveFileId;
+    }
+
     public void markFailed(String message) {
         this.status = AiJobStatus.FAILED;
         this.errorMessage = message;

@@ -1,6 +1,6 @@
 # AI 분석 (장면 분류 · Best Shot · 동영상)
 
-> 브랜치: `feat/ai-highlight-video`  
+> 브랜치: `feat/ai-highlight-drive`  
 > 참조: [Notion 요구사항](https://chip-sail-0e6.notion.site/Memory-Wedding-38f14c71cd4f806abfedef0e05f55306) · `docs/requirements-spec.md` FR-AI-001~018
 
 ## 1. 개요
@@ -19,7 +19,7 @@
 | FR-AI-003 | 동영상 분석 | ✅ 프레임 추출 + 장면 집계 |
 | FR-AI-004 | 장면 분류 | ✅ |
 | FR-AI-005 | 대표 장면(Best Shot) 선정 | ✅ 임계값 이상만 |
-| FR-AI-006~010 | 영상 생성·Drive·진행·알림·재생성 | △ 006 하이라이트 생성 ✅ / Drive·알림 후속 |
+| FR-AI-006~010 | 영상 생성·Drive·진행·알림·재생성 | △ 006·007 ✅ / 008~010 후속 |
 | FR-AI-011 | AI 분석 결과 조회 | ✅ |
 | FR-AI-012~018 | BGM·자막·스타일 등 | ❌ 후속 |
 
@@ -100,7 +100,7 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
    - 1280×720, 장당 약 3.2초
    - 최종 길이 ≈ Best Shot 사진 수 × 3.2초
 4. `ai_video_job` 저장 + ObjectStorage(`ai-highlight/{projectId}/...mp4`)
-5. **Drive 업로드는 FR-AI-007 후속** (`drive_file_id`는 비움)
+5. **Drive 연동 시** `AI/` 와 `Archive/` 에 동일 파일명으로 best-effort 업로드 (`drive_file_id` = AI 폴더 파일 ID). 미연동·실패해도 하이라이트는 COMPLETED 유지.
 
 재생: AI 페이지에서 생성 후 `<video>`로 미리보기.
 
@@ -110,7 +110,6 @@ backend 이미지에 `ffmpeg` 패키지 포함 (`backend/Dockerfile`).
 
 ## 10. 후속
 
-- FR-AI-007 Drive AI/Archive 저장
 - FR-AI-008~010 진행률·알림·재생성 UX
 - BGM·자막·스타일 (FR-AI-012~015)
 - 비동기 Queue (NFR-003)
