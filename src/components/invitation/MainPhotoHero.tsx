@@ -62,7 +62,10 @@ export function MainPhotoHero({
           className="absolute inset-0 h-full w-full object-cover"
           style={{ filter, objectPosition }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
+        <div
+          className="absolute inset-0"
+          style={{ background: "var(--inv-hero-overlay, linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0.15), transparent))" }}
+        />
         <div className="absolute inset-x-0 bottom-0 px-6 pb-10 text-center text-white">
           <p className="mb-3 text-[11px] tracking-[0.32em] uppercase opacity-90">
             Wedding Invitation
@@ -72,13 +75,22 @@ export function MainPhotoHero({
             style={{ fontFamily: "var(--font-playfair), serif" }}
           >
             {groomName}
-            <span className="mx-3 inline-block text-lg text-[#E8D5B5]" aria-hidden>
+            <span
+              className="mx-3 inline-block text-lg"
+              style={{ color: "var(--inv-accent, #E8D5B5)" }}
+              aria-hidden
+            >
               &
             </span>
             {brideName}
           </h1>
           {title && (
-            <p className="mt-3 text-sm tracking-wide text-[#E8D5B5]">{title}</p>
+            <p
+              className="mt-3 text-sm tracking-wide"
+              style={{ color: "var(--inv-accent, #E8D5B5)" }}
+            >
+              {title}
+            </p>
           )}
         </div>
       </section>

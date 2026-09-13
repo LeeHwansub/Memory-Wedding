@@ -3,6 +3,7 @@ package com.memorywedding.invitation.dto;
 import com.memorywedding.domain.entity.Invitation;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.GalleryLayout;
+import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public record InvitationResponse(
         LocalDateTime weddingAt,
         String slug,
         String guestPath,
+        InvitationTemplate template,
         GalleryLayout galleryLayout,
         int galleryColumns,
         MediaDisplaySize galleryImageSize,
@@ -57,6 +59,9 @@ public record InvitationResponse(
                 project.getWeddingAt(),
                 project.getSlug(),
                 "/w/" + project.getSlug(),
+                invitation.getTemplate() == null
+                        ? InvitationTemplate.CLASSIC
+                        : invitation.getTemplate(),
                 invitation.getGalleryLayout() == null
                         ? GalleryLayout.SLIDER
                         : invitation.getGalleryLayout(),

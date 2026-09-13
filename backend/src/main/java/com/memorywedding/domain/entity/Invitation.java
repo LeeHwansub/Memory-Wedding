@@ -1,6 +1,7 @@
 package com.memorywedding.domain.entity;
 
 import com.memorywedding.domain.enums.GalleryLayout;
+import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
 import jakarta.persistence.Column;
@@ -50,6 +51,10 @@ public class Invitation extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    private InvitationTemplate template = InvitationTemplate.CLASSIC;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private GalleryLayout galleryLayout = GalleryLayout.SLIDER;
 
     @Column(nullable = false)
@@ -85,6 +90,7 @@ public class Invitation extends BaseTimeEntity {
         this.title = title;
         this.greetingMessage = greetingMessage;
         this.published = false;
+        this.template = InvitationTemplate.CLASSIC;
         this.galleryLayout = GalleryLayout.SLIDER;
         this.galleryColumns = 2;
         this.galleryImageSize = MediaDisplaySize.MD;
@@ -104,6 +110,7 @@ public class Invitation extends BaseTimeEntity {
     }
 
     public void updateMediaSettings(
+            InvitationTemplate template,
             GalleryLayout galleryLayout,
             Integer galleryColumns,
             MediaDisplaySize galleryImageSize,
@@ -113,6 +120,9 @@ public class Invitation extends BaseTimeEntity {
             Double mainSaturation,
             Integer mainFocalX,
             Integer mainFocalY) {
+        if (template != null) {
+            this.template = template;
+        }
         if (galleryLayout != null) {
             this.galleryLayout = galleryLayout;
         }

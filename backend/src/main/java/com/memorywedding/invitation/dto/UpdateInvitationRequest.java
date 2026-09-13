@@ -1,6 +1,7 @@
 package com.memorywedding.invitation.dto;
 
 import com.memorywedding.domain.enums.GalleryLayout;
+import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ public record UpdateInvitationRequest(
         @Size(max = 200) String title,
         String greetingMessage,
         @Valid List<AccountEntry> accounts,
+        InvitationTemplate template,
         GalleryLayout galleryLayout,
         @Min(2) @Max(4) Integer galleryColumns,
         MediaDisplaySize galleryImageSize,

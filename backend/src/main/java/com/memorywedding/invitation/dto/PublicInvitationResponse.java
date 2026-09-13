@@ -1,6 +1,7 @@
 package com.memorywedding.invitation.dto;
 
 import com.memorywedding.domain.enums.GalleryLayout;
+import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
 import java.time.LocalDateTime;
@@ -17,6 +18,7 @@ public record PublicInvitationResponse(
         String venueName,
         String venueAddress,
         String slug,
+        InvitationTemplate template,
         GalleryLayout galleryLayout,
         int galleryColumns,
         MediaDisplaySize galleryImageSize,

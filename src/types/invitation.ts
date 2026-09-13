@@ -8,6 +8,12 @@ export type GalleryLayout = "SLIDER" | "COLLAGE" | "VERTICAL";
 export type MediaDisplaySize = "SM" | "MD" | "LG" | "FULL";
 export type MainPhotoPlacement = "TOP" | "MIDDLE";
 export type InvitationMediaType = "MAIN" | "GALLERY";
+export type InvitationTemplate =
+  | "CLASSIC"
+  | "IVORY"
+  | "NOIR"
+  | "SAGE"
+  | "ROSE";
 
 export type InvitationMedia = {
   id: number;
@@ -20,6 +26,7 @@ export type InvitationMedia = {
 };
 
 export type InvitationMediaSettings = {
+  template: InvitationTemplate;
   galleryLayout: GalleryLayout;
   galleryColumns: number;
   galleryImageSize: MediaDisplaySize;
