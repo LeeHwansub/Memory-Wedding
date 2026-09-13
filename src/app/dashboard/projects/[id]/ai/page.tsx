@@ -11,6 +11,9 @@ import {
   type AiJobStatus,
   type AiPhotoResult,
   type AiVideoJob,
+  type CreateHighlightRequest,
+  type HighlightLength,
+  type HighlightStyle,
   type SceneCategory,
 } from "@/types/ai";
 
@@ -20,6 +23,18 @@ const HIGHLIGHT_STEPS = [
   "영상 합치기",
   "클라우드 저장",
 ] as const;
+
+const STYLE_OPTIONS: { value: HighlightStyle; label: string }[] = [
+  { value: "CLASSIC", label: "기본" },
+  { value: "SOFT", label: "감성" },
+  { value: "CINEMATIC", label: "시네마틱" },
+];
+
+const LENGTH_OPTIONS: { value: HighlightLength; label: string; hint: string }[] = [
+  { value: "SHORT", label: "짧게", hint: "최대 6클립" },
+  { value: "MEDIUM", label: "보통", hint: "기본" },
+  { value: "LONG", label: "길게", hint: "클립·길이 확장" },
+];
 
 const POLL_MS = 1500;
 
@@ -55,6 +70,10 @@ export default function ProjectAiPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [justCompletedVideoId, setJustCompletedVideoId] = useState<number | null>(null);
+  const [style, setStyle] = useState<HighlightStyle>("CLASSIC");
+  const [length, setLength] = useState<HighlightLength>("MEDIUM");
+  const [bgm, setBgm] = useState(false);
+  const [subtitles, setSubtitles] = useState(false);
 
   async function load() {
     const res = await apiFetch<AiDashboard>(`/api/projects/${params.id}/ai`);
@@ -205,8 +224,10 @@ export default function ProjectAiPage() {
     setMessage(null);
     setJustCompletedVideoId(null);
     try {
+      const body: CreateHighlightRequest = { style, length, bgm, subtitles };
       const res = await apiFetch<AiVideoJob>(`/api/projects/${params.id}/ai/video`, {
         method: "POST",
+        body: JSON.stringify(body),
       });
       setTrackedVideoId(res.data?.id ?? null);
       const dash = await load();
@@ -271,6 +292,75 @@ export default function ProjectAiPage() {
           </button>
         </div>
       </div>
+
+      {!!data?.bestShots?.length && !makingVideo && (
+        <section className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <p className="mb-3 text-sm font-medium">영상 옵션</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs text-muted">스타일</p>
+              <div className="flex flex-wrap gap-2">
+                {STYLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={running}
+                    onClick={() => setStyle(opt.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
+                      style === opt.value
+                        ? "bg-accent text-white"
+                        : "border border-accent/30 text-accent hover:bg-accent/5"
+                    } disabled:opacity-50`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs text-muted">길이</p>
+              <div className="flex flex-wrap gap-2">
+                {LENGTH_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={running}
+                    onClick={() => setLength(opt.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
+                      length === opt.value
+                        ? "bg-accent text-white"
+                        : "border border-accent/30 text-accent hover:bg-accent/5"
+                    } disabled:opacity-50`}
+                    title={opt.hint}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={subtitles}
+                disabled={running}
+                onChange={(e) => setSubtitles(e.target.checked)}
+              />
+              장면 이름 자막
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={bgm}
+                disabled={running}
+                onChange={(e) => setBgm(e.target.checked)}
+              />
+              배경음악
+            </label>
+          </div>
+        </section>
+      )}
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       {message && <p className="mb-4 text-sm text-green-700">{message}</p>}

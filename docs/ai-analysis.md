@@ -26,7 +26,7 @@
 | FR-AI-009 | 생성 완료 안내 | ✅ 1차 | 페이지 내 배너·메시지. 푸시/메일은 후속 |
 | FR-AI-010 | 영상 재생성 | ✅ | 확인 다이얼로그 + 새 Job. 생성 중 중복 차단 |
 | FR-AI-011 | 분석 결과 조회 | ✅ | 대시보드 장면·Best Shot |
-| FR-AI-012~018 | BGM·자막·스타일·길이·중복·감정·인물 | ❌ | 후속 |
+| FR-AI-012~018 | BGM·자막·스타일·길이·중복·감정·인물 | △ 012~015 1차 / 016~018 ❌ |
 | NFR-003 | 비동기 AI 처리 | ✅ 1차 | 인메모리 `@Async` 스레드 풀 (외부 Broker 없음) |
 
 ## 3. 장면 카테고리 (FR-AI-004)
@@ -121,6 +121,17 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 6. Drive 연동 시 `AI/` · `Archive/`에 `highlight-{slug}-{jobId}.mp4` best-effort 업로드  
    (`drive_file_id` = AI 폴더 파일 ID). 미연동·실패해도 Job은 COMPLETED 유지
 
+### 생성 옵션 (FR-AI-012~015 1차)
+
+| 옵션 | 값 | 동작 |
+|------|-----|------|
+| style | CLASSIC / SOFT / CINEMATIC | 줌·페이드 강도 |
+| length | SHORT / MEDIUM / LONG | 클립 길이·최대 개수 |
+| subtitles | on/off | 장면명(입장·축가…) 간단 자막 |
+| bgm | on/off | `classpath:bgm/default.mp3` 있으면 믹스, 없으면 무음 |
+
+POST `/api/projects/{id}/ai/video` body 예: `{ "style":"SOFT","length":"SHORT","bgm":false,"subtitles":true }`
+
 ### 진행 · 완료 · 재생성 (FR-AI-008~010)
 
 | FR | 구현 |
@@ -153,6 +164,6 @@ Gemini env는 `docker-compose.yml` / `.env`로 전달. AI·ffmpeg 변경 후: `d
 ## 11. 후속 (우선순위 제안)
 
 1. Redis 등 외부 Queue · 재시도/데드레터 (NFR-003 고도화)
-2. **FR-AI-012~015** — BGM · 자막 · 스타일 · 길이
-3. FR-AI-009 푸시/메일 · FR-AI-016~018
-4. VIDEO 중간 하이라이트 구간 자동 선정 (현재는 앞부분 trim)
+2. AI BGM 추천 · LLM 자막 문장 (012·013 고도화)
+3. FR-AI-016~018 · VIDEO 중간 구간 자동 선정
+4. 기본 BGM 음원 라이선스 확보 후 `resources/bgm/default.mp3` 배포

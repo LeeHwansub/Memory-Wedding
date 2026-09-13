@@ -58,6 +58,10 @@ public class AiVideoJob extends BaseTimeEntity {
     @Column(nullable = false)
     private int processedClips;
 
+    /** 생성 옵션 JSON (style/length/bgm/subtitles). */
+    @Column(columnDefinition = "TEXT")
+    private String optionsJson;
+
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -72,6 +76,10 @@ public class AiVideoJob extends BaseTimeEntity {
         this.status = AiJobStatus.PENDING;
         this.clipCount = 0;
         this.processedClips = 0;
+    }
+
+    public void applyOptionsJson(String optionsJson) {
+        this.optionsJson = optionsJson;
     }
 
     public void markProcessing(int clipCount) {

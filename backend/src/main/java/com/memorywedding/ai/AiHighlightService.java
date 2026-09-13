@@ -1,6 +1,9 @@
 package com.memorywedding.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.memorywedding.ai.dto.AiVideoJobResponse;
+import com.memorywedding.ai.dto.CreateHighlightRequest;
 import com.memorywedding.common.BadRequestException;
 import com.memorywedding.common.ForbiddenException;
 import com.memorywedding.common.NotFoundException;
@@ -11,6 +14,7 @@ import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.AiJobStatus;
 import com.memorywedding.domain.enums.FileType;
+import com.memorywedding.domain.enums.SceneCategory;
 import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
@@ -23,8 +27,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,9 +44,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class AiHighlightService {
 
-    private static final double SECONDS_PER_PHOTO = 3.2;
-    private static final double SECONDS_PER_VIDEO = 4.0;
-
     private final WeddingProjectRepository weddingProjectRepository;
     private final MemberRepository memberRepository;
     private final AiVideoJobRepository aiVideoJobRepository;
@@ -50,9 +53,11 @@ public class AiHighlightService {
     private final AiAsyncDispatcher aiAsyncDispatcher;
     private final AiJobProgressService aiJobProgressService;
     private final AiHighlightWriteService aiHighlightWriteService;
+    private final ObjectMapper objectMapper;
 
     @Transactional
-    public AiVideoJobResponse createHighlight(Long memberId, Long projectId) {
+    public AiVideoJobResponse createHighlight(
+            Long memberId, Long projectId, CreateHighlightRequest request) {
         WeddingProject project = getOwnedProject(memberId, projectId);
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
                 .orElseThrow(() -> new NotFoundException("Member not found"));
@@ -66,14 +71,17 @@ public class AiHighlightService {
             throw new BadRequestException("이미 하이라이트 영상을 생성 중입니다. 완료 후 다시 시도해 주세요.");
         }
 
-        List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(projectId);
+        HighlightOptions options = resolveOptions(request);
+        List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(
+                projectId, options.maxClips());
         if (assets.isEmpty()) {
             throw new BadRequestException(
-                    "하이라이트에 쓸 Best Shot 사진·영상이 없습니다. AI 분석 후 다시 시도해 주세요.");
+                    "하이라이트에 쓸 대표 컷 사진·영상이 없습니다. AI 분석 후 다시 시도해 주세요.");
         }
 
         AiVideoJob job = aiVideoJobRepository.save(
                 AiVideoJob.builder().project(project).requestedBy(member).build());
+        job.applyOptionsJson(toOptionsJson(options));
         job.markProcessing(assets.size());
         aiVideoJobRepository.save(job);
 
@@ -92,9 +100,12 @@ public class AiHighlightService {
         Path workDir = null;
         try {
             Long projectId = aiHighlightWriteService.requireProjectId(jobId);
-            List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(projectId);
+            HighlightOptions options = parseOptionsJson(
+                    aiHighlightWriteService.requireOptionsJson(jobId));
+            List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(
+                    projectId, options.maxClips());
             if (assets.isEmpty()) {
-                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 사진·영상이 없습니다.");
+                aiJobProgressService.markHighlightFailed(jobId, "대표 컷 사진·영상이 없습니다.");
                 return;
             }
 
@@ -114,21 +125,24 @@ public class AiHighlightService {
                     log.warn("Skip highlight asset upload {}: empty or unreadable", file.getId());
                     continue;
                 }
+                String sceneLabel = options.subtitles()
+                        ? sceneLabelKo(result.getSceneCategory())
+                        : null;
                 segments.add(new HighlightVideoComposer.Segment(
                         video
                                 ? HighlightVideoComposer.SegmentKind.VIDEO
                                 : HighlightVideoComposer.SegmentKind.PHOTO,
-                        mediaPath));
+                        mediaPath,
+                        sceneLabel));
                 index += 1;
                 aiJobProgressService.bumpHighlightProcessed(jobId);
             }
             if (segments.isEmpty()) {
-                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 원본을 읽지 못했습니다.");
+                aiJobProgressService.markHighlightFailed(jobId, "대표 컷 원본을 읽지 못했습니다.");
                 return;
             }
 
-            byte[] mp4 = highlightVideoComposer.composeSegments(
-                    segments, SECONDS_PER_PHOTO, SECONDS_PER_VIDEO);
+            byte[] mp4 = highlightVideoComposer.composeSegments(segments, options);
             String objectKey = "ai-highlight/" + projectId + "/" + UUID.randomUUID() + ".mp4";
             ObjectStorage.StoredObject stored = objectStorage.store(
                     objectKey,
@@ -191,6 +205,7 @@ public class AiHighlightService {
                 ? "/api/projects/" + projectId + "/ai/video/" + fresh.getId() + "/content"
                 : null;
         boolean driveSynced = fresh.getDriveFileId() != null && !fresh.getDriveFileId().isBlank();
+        HighlightOptions options = parseOptionsJson(fresh.getOptionsJson());
         return new AiVideoJobResponse(
                 fresh.getId(),
                 fresh.getStatus(),
@@ -201,10 +216,68 @@ public class AiHighlightService {
                 fresh.getDriveFileId(),
                 driveSynced,
                 fresh.getErrorMessage(),
+                options.style().name(),
+                options.length().name(),
+                options.bgm(),
+                options.subtitles(),
                 fresh.getStartedAt(),
                 fresh.getCompletedAt(),
                 fresh.getCreatedAt()
         );
+    }
+
+    private HighlightOptions resolveOptions(CreateHighlightRequest request) {
+        if (request == null) {
+            return HighlightOptions.defaults();
+        }
+        return HighlightOptions.fromRequest(
+                request.style(), request.length(), request.bgm(), request.subtitles());
+    }
+
+    private String toOptionsJson(HighlightOptions options) {
+        try {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("style", options.style().name());
+            map.put("length", options.length().name());
+            map.put("bgm", options.bgm());
+            map.put("subtitles", options.subtitles());
+            return objectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return "{\"style\":\"CLASSIC\",\"length\":\"MEDIUM\",\"bgm\":false,\"subtitles\":false}";
+        }
+    }
+
+    private HighlightOptions parseOptionsJson(String json) {
+        if (json == null || json.isBlank()) {
+            return HighlightOptions.defaults();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            return HighlightOptions.fromRequest(
+                    textOrNull(node, "style"),
+                    textOrNull(node, "length"),
+                    node.has("bgm") && node.get("bgm").asBoolean(false),
+                    node.has("subtitles") && node.get("subtitles").asBoolean(false));
+        } catch (Exception e) {
+            return HighlightOptions.defaults();
+        }
+    }
+
+    private String textOrNull(JsonNode node, String field) {
+        return node.has(field) && !node.get(field).isNull() ? node.get(field).asText() : null;
+    }
+
+    private String sceneLabelKo(SceneCategory category) {
+        if (category == null) {
+            return null;
+        }
+        return switch (category) {
+            case ENTRANCE -> "입장";
+            case SONG -> "축가";
+            case GROUP_PHOTO -> "단체사진";
+            case RECEPTION -> "피로연";
+            case OTHER -> "기타";
+        };
     }
 
     private boolean copyToFile(UploadFile file, Path dest) {

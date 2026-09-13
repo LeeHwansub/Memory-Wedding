@@ -1,6 +1,7 @@
 package com.memorywedding.ai;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -10,11 +11,12 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 /**
- * 웨딩 하이라이트: 사진(줌) 클립 + 영상 앞부분 클립을 만든 뒤 이어 붙입니다.
- * zoompan+xfade 한 그래프는 타임스탬프 꼬임으로 긴 검은 화면이 나와, 클립 단위 합성 후 concat 합니다.
+ * 웨딩 하이라이트: 사진(줌) + 영상 앞부분 클립 합성.
+ * 스타일·길이·장면 자막·선택적 BGM을 지원합니다.
  */
 @Slf4j
 @Component
@@ -23,16 +25,16 @@ public class HighlightVideoComposer {
     private static final int WIDTH = 1280;
     private static final int HEIGHT = 720;
     private static final int FPS = 30;
-    private static final double DEFAULT_PHOTO_SECONDS = 3.2;
-    private static final double DEFAULT_VIDEO_SECONDS = 4.0;
-    private static final double FADE_SECONDS = 0.7;
 
     public enum SegmentKind {
         PHOTO,
         VIDEO
     }
 
-    public record Segment(SegmentKind kind, Path source) {
+    public record Segment(SegmentKind kind, Path source, String sceneLabel) {
+        public Segment(SegmentKind kind, Path source) {
+            this(kind, source, null);
+        }
     }
 
     public boolean isAvailable() {
@@ -47,38 +49,32 @@ public class HighlightVideoComposer {
         }
     }
 
-    /** 사진만으로 슬라이드쇼 (하위 호환). */
     public byte[] composeSlideshow(List<Path> imageFiles, double secondsPerImage) throws IOException {
         if (imageFiles == null || imageFiles.isEmpty()) {
             throw new IllegalArgumentException("이미지가 없습니다.");
         }
         List<Segment> segments = imageFiles.stream()
-                .map(path -> new Segment(SegmentKind.PHOTO, path))
+                .map(path -> new Segment(SegmentKind.PHOTO, path, null))
                 .toList();
-        return composeSegments(segments, secondsPerImage, DEFAULT_VIDEO_SECONDS);
+        return composeSegments(segments, HighlightOptions.defaults());
     }
 
-    /**
-     * 사진·영상을 예식 흐름 순으로 합성합니다.
-     * 각 클립을 1280×720 · 30fps · 무음으로 맞춘 뒤 concat 합니다.
-     */
-    public byte[] composeSegments(
-            List<Segment> segments,
-            double secondsPerPhoto,
-            double secondsPerVideo) throws IOException {
+    public byte[] composeSegments(List<Segment> segments, HighlightOptions options) throws IOException {
         if (segments == null || segments.isEmpty()) {
             throw new IllegalArgumentException("하이라이트 클립이 없습니다.");
         }
         if (!isAvailable()) {
             throw new IllegalStateException("FFmpeg가 설치되어 있지 않습니다.");
         }
+        HighlightOptions opts = options == null ? HighlightOptions.defaults() : options;
 
-        double photoHold = secondsPerPhoto > 0 ? secondsPerPhoto : DEFAULT_PHOTO_SECONDS;
-        double videoHold = secondsPerVideo > 0 ? secondsPerVideo : DEFAULT_VIDEO_SECONDS;
-        double photoFade = Math.min(FADE_SECONDS, photoHold / 2.5);
-        double videoFade = Math.min(FADE_SECONDS, videoHold / 2.5);
+        double photoHold = opts.photoSeconds();
+        double videoHold = opts.videoSeconds();
+        double photoFade = opts.fadeSeconds(photoHold);
+        double videoFade = opts.fadeSeconds(videoHold);
         int photoFrames = Math.max(1, (int) Math.round(photoHold * FPS));
         double photoDuration = photoFrames / (double) FPS;
+        String fontFile = resolveFontFile();
 
         Path workDir = Files.createTempDirectory("mw-highlight-");
         try {
@@ -91,21 +87,38 @@ public class HighlightVideoComposer {
                     Path img = workDir.resolve(String.format(Locale.ROOT, "img-%03d.%s", i,
                             extension(segment.source().getFileName().toString())));
                     Files.copy(segment.source(), img);
-                    renderPhotoClip(img, clip, photoFrames, photoDuration, photoFade, i % 2 == 0);
+                    renderPhotoClip(
+                            img, clip, photoFrames, photoDuration, photoFade,
+                            opts, i % 2 == 0, segment.sceneLabel(), fontFile);
                     totalDuration += photoDuration;
                 } else {
                     double videoDuration = renderVideoClip(
-                            segment.source(), clip, videoHold, videoFade);
+                            segment.source(), clip, videoHold, videoFade,
+                            segment.sceneLabel(), fontFile);
                     totalDuration += videoDuration;
                 }
                 clips.add(clip);
             }
 
-            Path output = workDir.resolve("highlight.mp4");
-            concatClips(clips, output, totalDuration);
+            Path silent = workDir.resolve("highlight-silent.mp4");
+            concatClips(clips, silent, totalDuration);
 
-            log.info("Highlight composed: {} clips (mixed), expected ~{} ms, file {} bytes",
-                    clips.size(), Math.round(totalDuration * 1000), Files.size(output));
+            Path output = workDir.resolve("highlight.mp4");
+            if (opts.bgm()) {
+                Path bgm = extractBundledBgm(workDir);
+                if (bgm != null) {
+                    muxBgm(silent, bgm, output, totalDuration);
+                } else {
+                    log.info("BGM 요청됐지만 classpath:bgm/default.mp3 가 없어 무음으로 저장합니다.");
+                    Files.copy(silent, output);
+                }
+            } else {
+                Files.copy(silent, output);
+            }
+
+            log.info("Highlight composed: {} clips, style={}, length={}, ~{} ms, {} bytes",
+                    clips.size(), opts.style(), opts.length(),
+                    Math.round(totalDuration * 1000), Files.size(output));
             return Files.readAllBytes(output);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -121,10 +134,16 @@ public class HighlightVideoComposer {
             int frames,
             double duration,
             double fade,
-            boolean zoomIn) throws IOException, InterruptedException {
+            HighlightOptions opts,
+            boolean zoomIn,
+            String sceneLabel,
+            String fontFile) throws IOException, InterruptedException {
+        double zoomSpeed = opts.zoomSpeed();
+        double zoomMax = opts.zoomMax();
         String zoomExpr = zoomIn
-                ? "min(1.0+0.0012*on,1.10)"
-                : "if(lte(on,1),1.10,max(1.10-0.0012*on,1.0))";
+                ? String.format(Locale.ROOT, "min(1.0+%.4f*on,%.2f)", zoomSpeed, zoomMax)
+                : String.format(Locale.ROOT,
+                        "if(lte(on,1),%.2f,max(%.2f-%.4f*on,1.0))", zoomMax, zoomMax, zoomSpeed);
         double fadeOutStart = Math.max(0, duration - fade);
         String vf = String.format(Locale.ROOT,
                 "scale=%d:%d:force_original_aspect_ratio=increase,"
@@ -139,6 +158,7 @@ public class HighlightVideoComposer {
                 frames, WIDTH, HEIGHT, FPS,
                 FPS,
                 fade, fadeOutStart, fade);
+        vf = appendDrawText(vf, sceneLabel, fontFile, duration);
 
         List<String> command = List.of(
                 "ffmpeg", "-y",
@@ -159,12 +179,13 @@ public class HighlightVideoComposer {
         runFfmpeg(command, output.getParent(), 90, "photo clip");
     }
 
-    /** 영상 앞부분을 잘라 1280×720·30fps·무음으로 맞춥니다. 실제 사용 길이를 반환합니다. */
     private double renderVideoClip(
             Path video,
             Path output,
             double maxSeconds,
-            double fade) throws IOException, InterruptedException {
+            double fade,
+            String sceneLabel,
+            String fontFile) throws IOException, InterruptedException {
         double duration = Math.max(1.0, maxSeconds);
         int frames = Math.max(1, (int) Math.round(duration * FPS));
         double exactDuration = frames / (double) FPS;
@@ -176,6 +197,7 @@ public class HighlightVideoComposer {
                         + "fade=t=in:st=0:d=%.2f,fade=t=out:st=%.2f:d=%.2f",
                 WIDTH, HEIGHT, WIDTH, HEIGHT, FPS,
                 fade, fadeOutStart, fade);
+        vf = appendDrawText(vf, sceneLabel, fontFile, exactDuration);
 
         List<String> command = List.of(
                 "ffmpeg", "-y",
@@ -194,6 +216,24 @@ public class HighlightVideoComposer {
 
         runFfmpeg(command, output.getParent(), 120, "video clip");
         return exactDuration;
+    }
+
+    private String appendDrawText(String vf, String sceneLabel, String fontFile, double duration) {
+        if (sceneLabel == null || sceneLabel.isBlank() || fontFile == null) {
+            return vf;
+        }
+        String escaped = sceneLabel
+                .replace("\\", "\\\\")
+                .replace(":", "\\:")
+                .replace("'", "\\'");
+        double showFor = Math.min(2.0, Math.max(0.8, duration * 0.45));
+        return vf + String.format(Locale.ROOT,
+                ",drawtext=fontfile='%s':text='%s':fontsize=42:fontcolor=white:"
+                        + "borderw=2:bordercolor=black@0.6:x=(w-text_w)/2:y=h-90:"
+                        + "enable='between(t,0,%.2f)'",
+                fontFile.replace("'", "\\'").replace(":", "\\:"),
+                escaped,
+                showFor);
     }
 
     private void concatClips(List<Path> clips, Path output, double totalDuration)
@@ -221,6 +261,59 @@ public class HighlightVideoComposer {
         );
 
         runFfmpeg(command, output.getParent(), 180, "concat");
+    }
+
+    private void muxBgm(Path video, Path bgm, Path output, double totalDuration)
+            throws IOException, InterruptedException {
+        List<String> command = List.of(
+                "ffmpeg", "-y",
+                "-i", video.toAbsolutePath().toString(),
+                "-stream_loop", "-1",
+                "-i", bgm.toAbsolutePath().toString(),
+                "-t", String.format(Locale.ROOT, "%.3f", totalDuration + 0.05),
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-shortest",
+                "-movflags", "+faststart",
+                output.toAbsolutePath().toString()
+        );
+        runFfmpeg(command, output.getParent(), 120, "bgm mux");
+    }
+
+    private Path extractBundledBgm(Path workDir) {
+        try {
+            ClassPathResource resource = new ClassPathResource("bgm/default.mp3");
+            if (!resource.exists()) {
+                return null;
+            }
+            Path target = workDir.resolve("default.mp3");
+            try (InputStream in = resource.getInputStream()) {
+                Files.copy(in, target);
+            }
+            return Files.size(target) > 0 ? target : null;
+        } catch (Exception e) {
+            log.warn("BGM 리소스 로드 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String resolveFontFile() {
+        List<String> candidates = List.of(
+                "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/noto/NotoSansCJKkr-Regular.otf",
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+                "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+                "/Library/Fonts/AppleSDGothicNeo.ttc"
+        );
+        for (String path : candidates) {
+            if (Files.isRegularFile(Path.of(path))) {
+                return path;
+            }
+        }
+        log.warn("한글 자막용 폰트를 찾지 못했습니다. 장면 자막을 건너뜁니다.");
+        return null;
     }
 
     private void runFfmpeg(List<String> command, Path workDir, int timeoutSec, String label)

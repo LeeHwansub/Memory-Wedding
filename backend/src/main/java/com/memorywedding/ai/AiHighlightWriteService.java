@@ -37,10 +37,10 @@ public class AiHighlightWriteService {
 
     /**
      * Best Shot 사진·영상을 장면 흐름 순으로 가져옵니다.
-     * 영상 개수는 분석용 상한(GEMINI_MAX_VIDEOS)을 따릅니다.
+     * 영상 개수는 분석용 상한, 전체 클립 수는 maxClips 상한을 따릅니다.
      */
     @Transactional(readOnly = true)
-    public List<AiPhotoResult> loadHighlightAssets(Long projectId) {
+    public List<AiPhotoResult> loadHighlightAssets(Long projectId, int maxClips) {
         AiAnalysisJob analysis = aiAnalysisJobRepository
                 .findFirstByProject_IdOrderByCreatedAtDesc(projectId)
                 .orElseThrow(() -> new BadRequestException("먼저 AI 분석을 실행해 주세요."));
@@ -73,13 +73,18 @@ public class AiHighlightWriteService {
                     file.getOriginalFilename();
                     file.getMimeType();
                     file.getFileType();
+                    r.getSceneCategory();
                 })
                 .toList();
 
         int maxVideos = Math.max(0, geminiProperties.getMaxVideos());
+        int clipLimit = Math.max(1, maxClips);
         List<AiPhotoResult> selected = new ArrayList<>();
         int videoCount = 0;
         for (AiPhotoResult result : bestShots) {
+            if (selected.size() >= clipLimit) {
+                break;
+            }
             if (result.getUploadFile().getFileType() == FileType.VIDEO) {
                 if (videoCount >= maxVideos) {
                     continue;
@@ -89,6 +94,18 @@ public class AiHighlightWriteService {
             selected.add(result);
         }
         return selected;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AiPhotoResult> loadHighlightAssets(Long projectId) {
+        return loadHighlightAssets(projectId, 20);
+    }
+
+    @Transactional(readOnly = true)
+    public String requireOptionsJson(Long jobId) {
+        AiVideoJob job = aiVideoJobRepository.findById(jobId)
+                .orElseThrow(() -> new NotFoundException("Highlight job not found: " + jobId));
+        return job.getOptionsJson();
     }
 
     private boolean meetsConfidence(AiPhotoResult result) {

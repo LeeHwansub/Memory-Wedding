@@ -4,6 +4,7 @@ import com.memorywedding.ai.AiAnalysisService;
 import com.memorywedding.ai.AiHighlightService;
 import com.memorywedding.ai.dto.AiDashboardResponse;
 import com.memorywedding.ai.dto.AiVideoJobResponse;
+import com.memorywedding.ai.dto.CreateHighlightRequest;
 import com.memorywedding.common.ApiResponse;
 import com.memorywedding.domain.entity.AiVideoJob;
 import java.io.InputStream;
@@ -16,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -54,10 +56,11 @@ public class AiController {
     @PostMapping("/api/projects/{projectId}/ai/video")
     public ApiResponse<AiVideoJobResponse> createVideo(
             Authentication authentication,
-            @PathVariable Long projectId) {
+            @PathVariable Long projectId,
+            @RequestBody(required = false) CreateHighlightRequest request) {
         Long memberId = (Long) authentication.getPrincipal();
         return ApiResponse.ok(
-                aiHighlightService.createHighlight(memberId, projectId),
+                aiHighlightService.createHighlight(memberId, projectId, request),
                 "하이라이트 영상 생성을 시작했습니다.");
     }
 
