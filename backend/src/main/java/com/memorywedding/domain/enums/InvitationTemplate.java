@@ -5,5 +5,7 @@ public enum InvitationTemplate {
     IVORY,
     NOIR,
     SAGE,
-    ROSE
+    ROSE,
+    SLATE,
+    LINEN
 }
