@@ -15,8 +15,9 @@ app:
     redirect-uri: ${DRIVE_REDIRECT_URI:http://localhost:8080/api/drive/oauth/callback}
   gemini:
     api-key: ${GEMINI_API_KEY:}
-    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
     max-photos: ${GEMINI_MAX_PHOTOS:20}
+    min-confidence: ${GEMINI_MIN_CONFIDENCE:0.60}
   jwt:
     secret: change-me-in-production-use-long-random-string-at-least-32-chars
     expiration-ms: 86400000

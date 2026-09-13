@@ -124,25 +124,34 @@ public class AiAnalysisService {
 
     private AiDashboardResponse toDashboard(Long projectId, AiAnalysisJob job) {
         String mode = photoSceneAnalyzer.isLiveGemini() ? "gemini" : "mock";
+        double minConfidence = geminiProperties.getMinConfidence();
         if (job == null) {
-            return new AiDashboardResponse(null, List.of(), List.of(), mode);
+            return new AiDashboardResponse(null, List.of(), List.of(), mode, minConfidence, 0);
         }
-        List<AiPhotoResultResponse> results = aiPhotoResultRepository
+        List<AiPhotoResultResponse> all = aiPhotoResultRepository
                 .findByJob_IdOrderBySceneCategoryAscIdAsc(job.getId())
                 .stream()
                 .map(r -> toResultResponse(projectId, r))
                 .toList();
+        List<AiPhotoResultResponse> results = all.stream()
+                .filter(this::meetsConfidence)
+                .toList();
+        int excludedCount = all.size() - results.size();
         List<AiPhotoResultResponse> bestShots = results.stream()
                 .filter(AiPhotoResultResponse::bestShot)
                 .toList();
-        return new AiDashboardResponse(toJobResponse(job, mode), results, bestShots, mode);
+        return new AiDashboardResponse(
+                toJobResponse(job, mode), results, bestShots, mode, minConfidence, excludedCount);
     }
 
     private void markBestShots(List<AiPhotoResult> results) {
         Map<SceneCategory, List<AiPhotoResult>> byScene = new EnumMap<>(SceneCategory.class);
         for (AiPhotoResult result : results) {
-            byScene.computeIfAbsent(result.getSceneCategory(), key -> new ArrayList<>()).add(result);
             result.clearBestShot();
+            if (!meetsConfidence(result)) {
+                continue;
+            }
+            byScene.computeIfAbsent(result.getSceneCategory(), key -> new ArrayList<>()).add(result);
         }
         for (List<AiPhotoResult> group : byScene.values()) {
             group.stream()
@@ -152,6 +161,16 @@ public class AiAnalysisService {
                                     : r.getConfidence()))
                     .ifPresent(AiPhotoResult::markBestShot);
         }
+    }
+
+    private boolean meetsConfidence(AiPhotoResult result) {
+        BigDecimal min = BigDecimal.valueOf(geminiProperties.getMinConfidence());
+        return result.getConfidence() != null && result.getConfidence().compareTo(min) >= 0;
+    }
+
+    private boolean meetsConfidence(AiPhotoResultResponse result) {
+        BigDecimal min = BigDecimal.valueOf(geminiProperties.getMinConfidence());
+        return result.confidence() != null && result.confidence().compareTo(min) >= 0;
     }
 
     private byte[] readBytes(UploadFile file) {

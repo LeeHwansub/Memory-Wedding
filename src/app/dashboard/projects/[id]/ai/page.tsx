@@ -103,7 +103,7 @@ export default function ProjectAiPage() {
           </h1>
           <p className="mt-2 text-sm text-muted">
             하객 업로드 사진을 분석해 입장·축가·단체사진·피로연 등으로 분류하고 Best Shot을
-            고릅니다.
+            고릅니다. 일치율(confidence)이 낮은 사진은 분류에서 제외됩니다.
             {data?.analyzerMode === "mock"
               ? " (현재 mock 모드 — GEMINI_API_KEY 설정 시 Gemini 사용)"
               : " (Gemini 연동)"}
@@ -127,6 +127,12 @@ export default function ProjectAiPage() {
           <p>
             최근 Job #{data.latestJob.id} · {data.latestJob.status} ·{" "}
             {data.latestJob.processedFiles}/{data.latestJob.totalFiles}
+          </p>
+          <p className="mt-1 text-muted">
+            분류 기준 confidence ≥ {Math.round((data.minConfidence ?? 0.6) * 100)}%
+            {data.excludedCount > 0
+              ? ` · 제외 ${data.excludedCount}장 (원본 갤러리/Drive Photos 유지)`
+              : ""}
           </p>
           {data.latestJob.errorMessage && (
             <p className="mt-1 text-red-600">{data.latestJob.errorMessage}</p>
