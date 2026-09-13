@@ -13,6 +13,10 @@ public record AiVideoJobResponse(
         String driveFileId,
         boolean driveSynced,
         String errorMessage,
+        String style,
+        String length,
+        Boolean bgm,
+        Boolean subtitles,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
         LocalDateTime createdAt

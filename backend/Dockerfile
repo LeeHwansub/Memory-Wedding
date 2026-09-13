@@ -7,7 +7,7 @@ COPY src src
 RUN chmod +x gradlew && ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
-RUN apk add --no-cache curl ffmpeg
+RUN apk add --no-cache curl ffmpeg font-noto-cjk
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 EXPOSE 8080

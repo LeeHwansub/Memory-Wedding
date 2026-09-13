@@ -49,6 +49,16 @@ export type AiDashboard = {
   latestVideoJob?: AiVideoJob | null;
 };
 
+export type HighlightStyle = "CLASSIC" | "SOFT" | "CINEMATIC";
+export type HighlightLength = "SHORT" | "MEDIUM" | "LONG";
+
+export type CreateHighlightRequest = {
+  style?: HighlightStyle;
+  length?: HighlightLength;
+  bgm?: boolean;
+  subtitles?: boolean;
+};
+
 export type AiVideoJob = {
   id: number;
   status: AiJobStatus;
@@ -59,6 +69,10 @@ export type AiVideoJob = {
   driveFileId?: string | null;
   driveSynced?: boolean;
   errorMessage?: string | null;
+  style?: HighlightStyle | string | null;
+  length?: HighlightLength | string | null;
+  bgm?: boolean | null;
+  subtitles?: boolean | null;
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt?: string | null;
