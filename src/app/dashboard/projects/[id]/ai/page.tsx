@@ -15,10 +15,10 @@ import {
 } from "@/types/ai";
 
 const HIGHLIGHT_STEPS = [
-  "Best Shot 준비",
-  "클립 렌더 · 페이드/줌",
-  "영상 합성",
-  "Drive 저장(연동 시)",
+  "사진·영상 준비",
+  "장면 편집",
+  "영상 합치기",
+  "클라우드 저장",
 ] as const;
 
 const POLL_MS = 1500;
@@ -245,11 +245,7 @@ export default function ProjectAiPage() {
             AI 분석
           </h1>
           <p className="mt-2 text-sm text-muted">
-            하객 업로드 사진·영상을 분석해 입장·축가·단체사진·피로연 등으로 분류하고 Best Shot을
-            고릅니다. 일치율(confidence)이 낮은 항목은 분류에서 제외됩니다.
-            {data?.analyzerMode === "mock"
-              ? " (현재 mock 모드 — GEMINI_API_KEY 설정 시 Gemini 사용)"
-              : " (Gemini 연동)"}
+            하객이 올린 사진·영상을 장면별로 나누고, 대표 컷으로 하이라이트 영상을 만듭니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -283,31 +279,26 @@ export default function ProjectAiPage() {
         data?.latestVideoJob?.id === justCompletedVideoId &&
         data.latestVideoJob.status === "COMPLETED" && (
           <div className="mb-6 rounded-2xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-800">
-            하이라이트 영상이 준비되었습니다. 아래에서 바로 재생할 수 있습니다.
-            {data.latestVideoJob.driveSynced
-              ? " Google Drive AI/Archive에도 저장되었습니다."
-              : ""}
+            하이라이트 영상이 준비되었습니다. 아래에서 바로 볼 수 있습니다.
+            {data.latestVideoJob.driveSynced ? " Google Drive에도 저장했어요." : ""}
           </div>
         )}
 
       {running && data?.latestJob && (
         <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
-          <p className="mb-2 text-sm font-medium">분석 진행 {analyzePct}%</p>
+          <p className="mb-2 text-sm font-medium">분석 중 {analyzePct}%</p>
           <div className="h-2 overflow-hidden rounded-full bg-accent/10">
             <div
               className="h-full rounded-full bg-accent transition-all"
               style={{ width: `${analyzePct}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted">
-            {data.latestJob.processedFiles}/{data.latestJob.totalFiles} 파일 처리 중
-          </p>
         </div>
       )}
 
       {makingVideo && (
         <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
-          <p className="mb-3 text-sm font-medium">영상 생성 진행</p>
+          <p className="mb-3 text-sm font-medium">영상 만드는 중</p>
           <ol className="space-y-2 text-sm">
             {HIGHLIGHT_STEPS.map((label, index) => {
               const done = index < progressStep;
@@ -326,35 +317,15 @@ export default function ProjectAiPage() {
                   {done ? "✓ " : current ? "→ " : "· "}
                   {label}
                   {current ? "…" : ""}
-                  {index === 1 && data?.latestVideoJob
-                    ? ` (${data.latestVideoJob.processedClips ?? 0}/${data.latestVideoJob.clipCount || 0})`
-                    : ""}
                 </li>
               );
             })}
           </ol>
-          <p className="mt-3 text-xs text-muted">
-            서버에서 비동기로 생성 중입니다. 완료까지 잠시 기다려 주세요.
-          </p>
         </div>
       )}
 
-      {data?.latestJob && (
-        <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4 text-sm">
-          <p>
-            최근 Job #{data.latestJob.id} · {data.latestJob.status} ·{" "}
-            {data.latestJob.processedFiles}/{data.latestJob.totalFiles}
-          </p>
-          <p className="mt-1 text-muted">
-            분류 기준 confidence ≥ {Math.round((data.minConfidence ?? 0.6) * 100)}%
-            {data.excludedCount > 0
-              ? ` · 제외 ${data.excludedCount}건 (원본 갤러리/Drive 유지)`
-              : ""}
-          </p>
-          {data.latestJob.errorMessage && (
-            <p className="mt-1 text-red-600">{data.latestJob.errorMessage}</p>
-          )}
-        </div>
+      {data?.latestJob?.status === "FAILED" && data.latestJob.errorMessage && (
+        <p className="mb-6 text-sm text-red-600">{data.latestJob.errorMessage}</p>
       )}
 
       {!data?.latestJob && (
@@ -366,20 +337,6 @@ export default function ProjectAiPage() {
       {data?.latestVideoJob && (
         <section className="mb-10 rounded-2xl border border-accent/20 bg-white/70 p-4">
           <h2 className="mb-2 text-lg font-medium">하이라이트 영상</h2>
-          <p className="mb-3 text-sm text-muted">
-            Job #{data.latestVideoJob.id} · {data.latestVideoJob.status}
-            {data.latestVideoJob.clipCount
-              ? ` · Best Shot ${data.latestVideoJob.clipCount}장`
-              : ""}
-            {data.latestVideoJob.fileSize
-              ? ` · ${(data.latestVideoJob.fileSize / (1024 * 1024)).toFixed(1)} MB`
-              : ""}
-            {data.latestVideoJob.driveSynced
-              ? " · Drive AI/Archive 저장됨"
-              : data.latestVideoJob.status === "COMPLETED"
-                ? " · Drive 미연동 또는 업로드 대기"
-                : ""}
-          </p>
           {data.latestVideoJob.errorMessage && (
             <p className="mb-2 text-sm text-red-600">{data.latestVideoJob.errorMessage}</p>
           )}
@@ -391,21 +348,19 @@ export default function ProjectAiPage() {
               className="w-full max-w-xl rounded-xl bg-black"
             />
           ) : data.latestVideoJob.status === "COMPLETED" ? (
-            <p className="text-sm text-muted">영상 로딩 중...</p>
+            <p className="text-sm text-muted">영상 불러오는 중...</p>
           ) : data.latestVideoJob.status === "PROCESSING" ||
             data.latestVideoJob.status === "PENDING" ? (
-            <p className="text-sm text-muted">서버에서 영상을 생성 중입니다…</p>
-          ) : null}
-          <p className="mt-2 text-xs text-muted">
-            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 연결 시 AI/·Archive/에 함께
-            저장됩니다. 다시 생성하면 새 Job이 추가됩니다.
-          </p>
+            <p className="text-sm text-muted">영상을 만들고 있습니다…</p>
+          ) : data.latestVideoJob.status === "FAILED" ? null : (
+            <p className="text-sm text-muted">아직 생성된 영상이 없습니다.</p>
+          )}
         </section>
       )}
 
       {data?.bestShots && data.bestShots.length > 0 && (
         <section className="mb-12">
-          <h2 className="mb-4 text-lg font-medium">Best Shot</h2>
+          <h2 className="mb-4 text-lg font-medium">대표 컷</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {data.bestShots.map((item) => (
               <ResultCard
@@ -466,12 +421,9 @@ function ResultCard({
         {video ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 px-3 text-center">
             <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] text-accent">
-              VIDEO
+              영상
             </span>
             <p className="line-clamp-3 text-[11px] text-muted">{item.originalFilename}</p>
-            {item.frameCount != null && (
-              <p className="text-[10px] text-muted">{item.frameCount}프레임 분석</p>
-            )}
           </div>
         ) : preview ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -483,27 +435,13 @@ function ResultCard({
         )}
         {(badge || item.bestShot) && (
           <span className="absolute left-2 top-2 rounded-full bg-accent px-2 py-0.5 text-[10px] text-white">
-            Best
+            대표
           </span>
         )}
       </div>
       <div className="space-y-0.5 p-2">
         <p className="truncate text-xs">{item.originalFilename}</p>
-        <p className="text-[10px] text-muted">
-          {item.guestName}
-          {item.confidence != null ? ` · ${(item.confidence * 100).toFixed(0)}%` : ""}
-        </p>
-        {(item.people?.length || item.objects?.length || item.place) && (
-          <p className="line-clamp-2 text-[10px] text-muted">
-            {item.people?.length ? `인물: ${item.people.join(", ")}` : ""}
-            {item.objects?.length
-              ? `${item.people?.length ? " · " : ""}객체: ${item.objects.join(", ")}`
-              : ""}
-            {item.place
-              ? `${item.people?.length || item.objects?.length ? " · " : ""}${item.place}`
-              : ""}
-          </p>
-        )}
+        {item.guestName && <p className="text-[10px] text-muted">{item.guestName}</p>}
       </div>
     </article>
   );

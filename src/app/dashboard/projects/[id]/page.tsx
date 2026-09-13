@@ -7,6 +7,7 @@ import { useProjectPreview } from "@/components/shell/ProjectShell";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { formatWeddingDateTime } from "@/lib/datetime";
+import { PROJECT_STATUS_LABELS } from "@/lib/labels";
 import { isProjectNavActive, PROJECT_NAV } from "@/lib/project-nav";
 import type { WeddingProject } from "@/types";
 
@@ -159,10 +160,12 @@ export default function ProjectDetailPage() {
       </div>
 
       <dl className="mb-8 space-y-3 rounded-2xl border border-accent/20 bg-white/60 p-6 text-sm">
-        <Row label="상태" value={project.status} />
-        <Row label="Slug" value={project.slug} />
-        <Row label="하객 경로" value={project.guestPath ?? `/w/${project.slug}`} />
-        <Row label="주소" value={project.venueAddress || "-"} />
+        <Row
+          label="상태"
+          value={PROJECT_STATUS_LABELS[project.status] ?? project.status}
+        />
+        <Row label="하객 초대 주소" value={project.guestPath ?? `/w/${project.slug}`} />
+        <Row label="예식장 주소" value={project.venueAddress || "-"} />
         <Row label="초대 링크" value={project.inviteActive ? "활성" : "비활성"} />
       </dl>
 

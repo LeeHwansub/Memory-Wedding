@@ -13,9 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Wedding highlight slideshow.
- * Renders each still to a fixed-length clip (Ken Burns + fade), then concatenates.
- * Avoids zoompan+xfade timestamp bugs that produced long black tails.
+ * 웨딩 하이라이트: 사진(줌) 클립 + 영상 앞부분 클립을 만든 뒤 이어 붙입니다.
+ * zoompan+xfade 한 그래프는 타임스탬프 꼬임으로 긴 검은 화면이 나와, 클립 단위 합성 후 concat 합니다.
  */
 @Slf4j
 @Component
@@ -24,8 +23,17 @@ public class HighlightVideoComposer {
     private static final int WIDTH = 1280;
     private static final int HEIGHT = 720;
     private static final int FPS = 30;
-    private static final double DEFAULT_HOLD_SECONDS = 3.2;
+    private static final double DEFAULT_PHOTO_SECONDS = 3.2;
+    private static final double DEFAULT_VIDEO_SECONDS = 4.0;
     private static final double FADE_SECONDS = 0.7;
+
+    public enum SegmentKind {
+        PHOTO,
+        VIDEO
+    }
+
+    public record Segment(SegmentKind kind, Path source) {
+    }
 
     public boolean isAvailable() {
         try {
@@ -39,42 +47,65 @@ public class HighlightVideoComposer {
         }
     }
 
-    /**
-     * @param imageFiles ordered stills (wedding narrative order)
-     * @param secondsPerImage hold duration per slide
-     */
+    /** 사진만으로 슬라이드쇼 (하위 호환). */
     public byte[] composeSlideshow(List<Path> imageFiles, double secondsPerImage) throws IOException {
         if (imageFiles == null || imageFiles.isEmpty()) {
             throw new IllegalArgumentException("이미지가 없습니다.");
+        }
+        List<Segment> segments = imageFiles.stream()
+                .map(path -> new Segment(SegmentKind.PHOTO, path))
+                .toList();
+        return composeSegments(segments, secondsPerImage, DEFAULT_VIDEO_SECONDS);
+    }
+
+    /**
+     * 사진·영상을 예식 흐름 순으로 합성합니다.
+     * 각 클립을 1280×720 · 30fps · 무음으로 맞춘 뒤 concat 합니다.
+     */
+    public byte[] composeSegments(
+            List<Segment> segments,
+            double secondsPerPhoto,
+            double secondsPerVideo) throws IOException {
+        if (segments == null || segments.isEmpty()) {
+            throw new IllegalArgumentException("하이라이트 클립이 없습니다.");
         }
         if (!isAvailable()) {
             throw new IllegalStateException("FFmpeg가 설치되어 있지 않습니다.");
         }
 
-        double hold = secondsPerImage > 0 ? secondsPerImage : DEFAULT_HOLD_SECONDS;
-        double fade = Math.min(FADE_SECONDS, hold / 2.5);
-        int frames = Math.max(1, (int) Math.round(hold * FPS));
-        double exactDuration = frames / (double) FPS;
+        double photoHold = secondsPerPhoto > 0 ? secondsPerPhoto : DEFAULT_PHOTO_SECONDS;
+        double videoHold = secondsPerVideo > 0 ? secondsPerVideo : DEFAULT_VIDEO_SECONDS;
+        double photoFade = Math.min(FADE_SECONDS, photoHold / 2.5);
+        double videoFade = Math.min(FADE_SECONDS, videoHold / 2.5);
+        int photoFrames = Math.max(1, (int) Math.round(photoHold * FPS));
+        double photoDuration = photoFrames / (double) FPS;
 
         Path workDir = Files.createTempDirectory("mw-highlight-");
         try {
             List<Path> clips = new ArrayList<>();
-            for (int i = 0; i < imageFiles.size(); i++) {
-                Path src = imageFiles.get(i);
-                Path img = workDir.resolve(String.format(Locale.ROOT, "img-%03d.%s", i,
-                        extension(src.getFileName().toString())));
-                Files.copy(src, img);
+            double totalDuration = 0;
+            for (int i = 0; i < segments.size(); i++) {
+                Segment segment = segments.get(i);
                 Path clip = workDir.resolve(String.format(Locale.ROOT, "clip-%03d.mp4", i));
-                renderClip(img, clip, frames, exactDuration, fade, i % 2 == 0);
+                if (segment.kind() == SegmentKind.PHOTO) {
+                    Path img = workDir.resolve(String.format(Locale.ROOT, "img-%03d.%s", i,
+                            extension(segment.source().getFileName().toString())));
+                    Files.copy(segment.source(), img);
+                    renderPhotoClip(img, clip, photoFrames, photoDuration, photoFade, i % 2 == 0);
+                    totalDuration += photoDuration;
+                } else {
+                    double videoDuration = renderVideoClip(
+                            segment.source(), clip, videoHold, videoFade);
+                    totalDuration += videoDuration;
+                }
                 clips.add(clip);
             }
 
             Path output = workDir.resolve("highlight.mp4");
-            concatClips(clips, output, exactDuration * clips.size());
+            concatClips(clips, output, totalDuration);
 
-            long expectedMs = Math.round(exactDuration * clips.size() * 1000);
-            log.info("Highlight composed: {} clips, expected ~{} ms, file {} bytes",
-                    clips.size(), expectedMs, Files.size(output));
+            log.info("Highlight composed: {} clips (mixed), expected ~{} ms, file {} bytes",
+                    clips.size(), Math.round(totalDuration * 1000), Files.size(output));
             return Files.readAllBytes(output);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -84,14 +115,13 @@ public class HighlightVideoComposer {
         }
     }
 
-    private void renderClip(
+    private void renderPhotoClip(
             Path image,
             Path output,
             int frames,
             double duration,
             double fade,
             boolean zoomIn) throws IOException, InterruptedException {
-        // Scale up slightly so zoompan can pan without black edges, then Ken Burns.
         String zoomExpr = zoomIn
                 ? "min(1.0+0.0012*on,1.10)"
                 : "if(lte(on,1),1.10,max(1.10-0.0012*on,1.0))";
@@ -126,7 +156,44 @@ public class HighlightVideoComposer {
                 output.toAbsolutePath().toString()
         );
 
-        runFfmpeg(command, output.getParent(), 90, "clip render");
+        runFfmpeg(command, output.getParent(), 90, "photo clip");
+    }
+
+    /** 영상 앞부분을 잘라 1280×720·30fps·무음으로 맞춥니다. 실제 사용 길이를 반환합니다. */
+    private double renderVideoClip(
+            Path video,
+            Path output,
+            double maxSeconds,
+            double fade) throws IOException, InterruptedException {
+        double duration = Math.max(1.0, maxSeconds);
+        int frames = Math.max(1, (int) Math.round(duration * FPS));
+        double exactDuration = frames / (double) FPS;
+        double fadeOutStart = Math.max(0, exactDuration - fade);
+        String vf = String.format(Locale.ROOT,
+                "scale=%d:%d:force_original_aspect_ratio=decrease,"
+                        + "pad=%d:%d:(ow-iw)/2:(oh-ih)/2,"
+                        + "fps=%d,format=yuv420p,setsar=1,setpts=PTS-STARTPTS,"
+                        + "fade=t=in:st=0:d=%.2f,fade=t=out:st=%.2f:d=%.2f",
+                WIDTH, HEIGHT, WIDTH, HEIGHT, FPS,
+                fade, fadeOutStart, fade);
+
+        List<String> command = List.of(
+                "ffmpeg", "-y",
+                "-ss", "0",
+                "-t", String.format(Locale.ROOT, "%.3f", exactDuration),
+                "-i", video.toAbsolutePath().toString(),
+                "-vf", vf,
+                "-frames:v", String.valueOf(frames),
+                "-t", String.format(Locale.ROOT, "%.3f", exactDuration),
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-an",
+                output.toAbsolutePath().toString()
+        );
+
+        runFfmpeg(command, output.getParent(), 120, "video clip");
+        return exactDuration;
     }
 
     private void concatClips(List<Path> clips, Path output, double totalDuration)
@@ -138,7 +205,6 @@ public class HighlightVideoComposer {
         }
         Files.writeString(listFile, list.toString());
 
-        // Re-encode on concat so timestamps stay continuous (copy can preserve bad PTS).
         List<String> command = List.of(
                 "ffmpeg", "-y",
                 "-f", "concat",
@@ -154,7 +220,7 @@ public class HighlightVideoComposer {
                 output.toAbsolutePath().toString()
         );
 
-        runFfmpeg(command, output.getParent(), 120, "concat");
+        runFfmpeg(command, output.getParent(), 180, "concat");
     }
 
     private void runFfmpeg(List<String> command, Path workDir, int timeoutSec, String label)
@@ -195,11 +261,11 @@ public class HighlightVideoComposer {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException ignored) {
-                    // best-effort
+                    // 정리 실패는 무시
                 }
             });
         } catch (IOException ignored) {
-            // best-effort
+            // 정리 실패는 무시
         }
     }
 }

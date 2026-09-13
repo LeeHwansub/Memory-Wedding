@@ -623,9 +623,7 @@ export default function InvitationDesignPage() {
           <section className="space-y-4">
             <div>
               <p className="text-sm font-medium">웨딩 갤러리</p>
-              <p className="mt-1 text-xs text-muted">
-                여러 장을 한 번에 선택할 수 있습니다. 공개 페이지에서는 카드 → 모달로 열립니다.
-              </p>
+              <p className="mt-1 text-xs text-muted">여러 장을 한 번에 올릴 수 있습니다.</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">

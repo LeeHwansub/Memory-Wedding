@@ -7,6 +7,7 @@ import { StatusModal } from "@/components/ui/StatusModal";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { toApiLocalDateTime, toDatetimeLocalValue } from "@/lib/datetime";
+import { PROJECT_STATUS_LABELS } from "@/lib/labels";
 import type { ProjectStatus, WeddingProject } from "@/types";
 
 type ProjectDriveStatus = {
@@ -224,9 +225,9 @@ export default function EditProjectPage() {
             onChange={(e) => setStatus(e.target.value as ProjectStatus)}
             className="w-full rounded-xl border border-accent/30 bg-white px-4 py-3"
           >
-            <option value="DRAFT">DRAFT</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="ARCHIVED">ARCHIVED</option>
+            <option value="DRAFT">{PROJECT_STATUS_LABELS.DRAFT}</option>
+            <option value="ACTIVE">{PROJECT_STATUS_LABELS.ACTIVE}</option>
+            <option value="ARCHIVED">{PROJECT_STATUS_LABELS.ARCHIVED}</option>
           </select>
         </label>
 
@@ -235,9 +236,6 @@ export default function EditProjectPage() {
             <div>
               <p className="text-sm font-medium">Google Drive</p>
               <p className="mt-1 text-xs text-muted">{driveLabel}</p>
-              <p className="mt-1 text-xs text-muted">
-                원본은 우리 저장소에 두고, Drive에는 사본만 전달합니다.
-              </p>
             </div>
             {!drive?.driveConnected ? (
               <button

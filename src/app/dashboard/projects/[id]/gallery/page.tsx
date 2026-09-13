@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StatusModal } from "@/components/ui/StatusModal";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { UPLOAD_STATUS_LABELS } from "@/lib/labels";
 import type {
   FileType,
   UploadFile,
@@ -328,7 +329,9 @@ export default function ProjectGalleryPage() {
                       />
                     ) : (
                       <p className="px-4 text-center text-xs text-muted">
-                        {file.fileType === "VIDEO" ? "VIDEO" : file.uploadStatus}
+                        {file.fileType === "VIDEO"
+                          ? "영상"
+                          : UPLOAD_STATUS_LABELS[file.uploadStatus] ?? file.uploadStatus}
                         <br />
                         {file.originalFilename}
                       </p>
@@ -337,8 +340,9 @@ export default function ProjectGalleryPage() {
                   <div className="space-y-2 p-4 text-sm">
                     <p className="break-all text-xs text-muted">{file.originalFilename}</p>
                     <p className="text-xs text-muted">
-                      {formatBytes(file.fileSize)} · {file.uploadStatus}
-                      {file.driveSynced ? " · Drive 동기화됨" : ""}
+                      {formatBytes(file.fileSize)} ·{" "}
+                      {UPLOAD_STATUS_LABELS[file.uploadStatus] ?? file.uploadStatus}
+                      {file.driveSynced ? " · Drive 저장됨" : ""}
                     </p>
                     <button
                       type="button"

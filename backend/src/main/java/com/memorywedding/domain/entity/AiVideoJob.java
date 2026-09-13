@@ -54,7 +54,7 @@ public class AiVideoJob extends BaseTimeEntity {
     @Column(nullable = false)
     private int clipCount;
 
-    /** Prepared image clips so far (progress while PROCESSING). */
+    /** 처리 중 준비한 클립 수 (진행률용). */
     @Column(nullable = false)
     private int processedClips;
 

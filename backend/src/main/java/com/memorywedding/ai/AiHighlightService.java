@@ -10,6 +10,7 @@ import com.memorywedding.domain.entity.Member;
 import com.memorywedding.domain.entity.UploadFile;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.AiJobStatus;
+import com.memorywedding.domain.enums.FileType;
 import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
@@ -17,11 +18,13 @@ import com.memorywedding.drive.DriveSyncService;
 import com.memorywedding.storage.ObjectStorage;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +38,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class AiHighlightService {
 
-    private static final double SECONDS_PER_IMAGE = 3.2;
+    private static final double SECONDS_PER_PHOTO = 3.2;
+    private static final double SECONDS_PER_VIDEO = 4.0;
 
     private final WeddingProjectRepository weddingProjectRepository;
     private final MemberRepository memberRepository;
@@ -62,15 +66,15 @@ public class AiHighlightService {
             throw new BadRequestException("이미 하이라이트 영상을 생성 중입니다. 완료 후 다시 시도해 주세요.");
         }
 
-        List<AiPhotoResult> bestPhotos = aiHighlightWriteService.loadBestPhotos(projectId);
-        if (bestPhotos.isEmpty()) {
+        List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(projectId);
+        if (assets.isEmpty()) {
             throw new BadRequestException(
-                    "하이라이트에 쓸 Best Shot 사진이 없습니다. AI 분석 후 다시 시도해 주세요.");
+                    "하이라이트에 쓸 Best Shot 사진·영상이 없습니다. AI 분석 후 다시 시도해 주세요.");
         }
 
         AiVideoJob job = aiVideoJobRepository.save(
                 AiVideoJob.builder().project(project).requestedBy(member).build());
-        job.markProcessing(bestPhotos.size());
+        job.markProcessing(assets.size());
         aiVideoJobRepository.save(job);
 
         Long jobId = job.getId();
@@ -88,34 +92,43 @@ public class AiHighlightService {
         Path workDir = null;
         try {
             Long projectId = aiHighlightWriteService.requireProjectId(jobId);
-            List<AiPhotoResult> bestPhotos = aiHighlightWriteService.loadBestPhotos(projectId);
-            if (bestPhotos.isEmpty()) {
-                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 사진이 없습니다.");
+            List<AiPhotoResult> assets = aiHighlightWriteService.loadHighlightAssets(projectId);
+            if (assets.isEmpty()) {
+                aiJobProgressService.markHighlightFailed(jobId, "Best Shot 사진·영상이 없습니다.");
                 return;
             }
 
             workDir = Files.createTempDirectory("mw-highlight-in-");
-            List<Path> images = new ArrayList<>();
+            List<HighlightVideoComposer.Segment> segments = new ArrayList<>();
             int index = 0;
-            for (AiPhotoResult result : bestPhotos) {
+            for (AiPhotoResult result : assets) {
                 UploadFile file = result.getUploadFile();
-                byte[] bytes = readBytes(file);
-                if (bytes.length == 0) {
+                FileType type = file.getFileType();
+                boolean video = type == FileType.VIDEO;
+                String ext = video
+                        ? guessVideoExt(file.getOriginalFilename(), file.getMimeType())
+                        : guessImageExt(file.getOriginalFilename(), file.getMimeType());
+                Path mediaPath = workDir.resolve(String.format(
+                        Locale.ROOT, "%s-%03d.%s", video ? "vid" : "img", index, ext));
+                if (!copyToFile(file, mediaPath)) {
+                    log.warn("Skip highlight asset upload {}: empty or unreadable", file.getId());
                     continue;
                 }
-                String ext = guessExt(file.getOriginalFilename(), file.getMimeType());
-                Path imagePath = workDir.resolve(String.format("img-%03d.%s", index, ext));
-                Files.write(imagePath, bytes);
-                images.add(imagePath);
+                segments.add(new HighlightVideoComposer.Segment(
+                        video
+                                ? HighlightVideoComposer.SegmentKind.VIDEO
+                                : HighlightVideoComposer.SegmentKind.PHOTO,
+                        mediaPath));
                 index += 1;
                 aiJobProgressService.bumpHighlightProcessed(jobId);
             }
-            if (images.isEmpty()) {
+            if (segments.isEmpty()) {
                 aiJobProgressService.markHighlightFailed(jobId, "Best Shot 원본을 읽지 못했습니다.");
                 return;
             }
 
-            byte[] mp4 = highlightVideoComposer.composeSlideshow(images, SECONDS_PER_IMAGE);
+            byte[] mp4 = highlightVideoComposer.composeSegments(
+                    segments, SECONDS_PER_PHOTO, SECONDS_PER_VIDEO);
             String objectKey = "ai-highlight/" + projectId + "/" + UUID.randomUUID() + ".mp4";
             ObjectStorage.StoredObject stored = objectStorage.store(
                     objectKey,
@@ -136,11 +149,11 @@ public class AiHighlightService {
                         try {
                             Files.deleteIfExists(p);
                         } catch (Exception ignored) {
-                            // best-effort
+                            // 정리 실패는 무시
                         }
                     });
                 } catch (Exception ignored) {
-                    // best-effort
+                    // 정리 실패는 무시
                 }
             }
         }
@@ -194,22 +207,25 @@ public class AiHighlightService {
         );
     }
 
-    private byte[] readBytes(UploadFile file) {
+    private boolean copyToFile(UploadFile file, Path dest) {
         if (file.getStorageKey() == null) {
-            return new byte[0];
+            return false;
         }
-        try (InputStream in = objectStorage.open(file.getStorageKey())) {
-            return in.readAllBytes();
+        try (InputStream in = objectStorage.open(file.getStorageKey());
+                OutputStream out = Files.newOutputStream(dest)) {
+            in.transferTo(out);
+            return Files.size(dest) > 0;
         } catch (Exception e) {
-            return new byte[0];
+            log.warn("Failed to copy upload {} to temp: {}", file.getId(), e.getMessage());
+            return false;
         }
     }
 
-    private String guessExt(String filename, String mime) {
+    private String guessImageExt(String filename, String mime) {
         if (filename != null) {
             int dot = filename.lastIndexOf('.');
             if (dot > 0) {
-                String ext = filename.substring(dot + 1).toLowerCase();
+                String ext = filename.substring(dot + 1).toLowerCase(Locale.ROOT);
                 if (ext.matches("jpe?g|png|webp")) {
                     return ext.equals("jpeg") ? "jpg" : ext;
                 }
@@ -219,6 +235,27 @@ public class AiHighlightService {
             return "png";
         }
         return "jpg";
+    }
+
+    private String guessVideoExt(String filename, String mime) {
+        if (filename != null) {
+            int dot = filename.lastIndexOf('.');
+            if (dot > 0) {
+                String ext = filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+                if (ext.matches("mp4|mov|webm|m4v")) {
+                    return ext;
+                }
+            }
+        }
+        if (mime != null) {
+            if (mime.contains("webm")) {
+                return "webm";
+            }
+            if (mime.contains("quicktime")) {
+                return "mov";
+            }
+        }
+        return "mp4";
     }
 
     private WeddingProject getOwnedProject(Long memberId, Long projectId) {
