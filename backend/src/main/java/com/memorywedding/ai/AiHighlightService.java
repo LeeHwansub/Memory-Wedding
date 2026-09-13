@@ -62,6 +62,11 @@ public class AiHighlightService {
             throw new BadRequestException("FFmpeg가 없어 하이라이트 영상을 생성할 수 없습니다.");
         }
 
+        if (aiVideoJobRepository.existsByProject_IdAndStatusIn(
+                projectId, List.of(AiJobStatus.PENDING, AiJobStatus.PROCESSING))) {
+            throw new BadRequestException("이미 하이라이트 영상을 생성 중입니다. 완료 후 다시 시도해 주세요.");
+        }
+
         AiAnalysisJob analysis = aiAnalysisJobRepository
                 .findFirstByProject_IdOrderByCreatedAtDesc(projectId)
                 .orElseThrow(() -> new BadRequestException("먼저 AI 분석을 실행해 주세요."));
