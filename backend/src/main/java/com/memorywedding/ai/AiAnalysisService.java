@@ -19,6 +19,7 @@ import com.memorywedding.domain.enums.SceneCategory;
 import com.memorywedding.domain.enums.UploadStatus;
 import com.memorywedding.domain.repository.AiAnalysisJobRepository;
 import com.memorywedding.domain.repository.AiPhotoResultRepository;
+import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.UploadFileRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
@@ -49,6 +50,8 @@ public class AiAnalysisService {
     private final ObjectStorage objectStorage;
     private final PhotoSceneAnalyzer photoSceneAnalyzer;
     private final VideoFrameExtractor videoFrameExtractor;
+    private final AiVideoJobRepository aiVideoJobRepository;
+    private final AiHighlightService aiHighlightService;
     private final GeminiProperties geminiProperties;
     private final ObjectMapper objectMapper;
 
@@ -220,8 +223,12 @@ public class AiAnalysisService {
     private AiDashboardResponse toDashboard(Long projectId, AiAnalysisJob job) {
         String mode = photoSceneAnalyzer.isLiveGemini() ? "gemini" : "mock";
         double minConfidence = geminiProperties.getMinConfidence();
+        var latestVideo = aiVideoJobRepository.findFirstByProject_IdOrderByCreatedAtDesc(projectId)
+                .map(videoJob -> aiHighlightService.toResponse(projectId, videoJob))
+                .orElse(null);
         if (job == null) {
-            return new AiDashboardResponse(null, List.of(), List.of(), mode, minConfidence, 0);
+            return new AiDashboardResponse(
+                    null, List.of(), List.of(), mode, minConfidence, 0, latestVideo);
         }
         List<AiPhotoResultResponse> all = aiPhotoResultRepository
                 .findByJob_IdOrderBySceneCategoryAscIdAsc(job.getId())
@@ -236,7 +243,13 @@ public class AiAnalysisService {
                 .filter(AiPhotoResultResponse::bestShot)
                 .toList();
         return new AiDashboardResponse(
-                toJobResponse(job, mode), results, bestShots, mode, minConfidence, excludedCount);
+                toJobResponse(job, mode),
+                results,
+                bestShots,
+                mode,
+                minConfidence,
+                excludedCount,
+                latestVideo);
     }
 
     private void markBestShots(List<AiPhotoResult> results) {

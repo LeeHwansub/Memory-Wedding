@@ -173,7 +173,7 @@ erDiagram
 | 8 | `drive_connection` | Google Drive OAuth 연동 | ✅ |
 | 9 | `ai_analysis_job` | AI 사진 분석 작업 | ✅ (1차) |
 | 10 | `ai_photo_result` | AI 장면 분류·Best Shot 결과 | ✅ (1차) |
-| 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ❌ |
+| 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ✅ (1차, Drive 저장 제외) |
 
 ---
 
@@ -357,7 +357,7 @@ VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 
 ---
 
-### 3.11 ai_video_job (MVP 이후)
+### 3.11 ai_video_job (1차 · Drive 저장 후속)
 
 | 컬럼 | 타입 | Null | Key | 설명 |
 |------|------|------|-----|------|
@@ -365,7 +365,11 @@ VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 | project_id | BIGINT | NO | FK | Wedding Project |
 | requested_by | BIGINT | NO | FK → member.id | 요청자 |
 | status | ENUM('PENDING','PROCESSING','COMPLETED','FAILED') | NO | | 작업 상태 |
-| drive_file_id | VARCHAR(100) | YES | | 생성된 영상 Drive ID |
+| drive_file_id | VARCHAR(100) | YES | | Drive File ID (FR-AI-007) |
+| storage_key | VARCHAR(500) | YES | | ObjectStorage 키 (서버 보관) |
+| storage_provider | VARCHAR(50) | YES | | local / gcs |
+| file_size | BIGINT | YES | | 바이트 |
+| clip_count | INT | NO | | 사용한 Best Shot 수 |
 | error_message | TEXT | YES | | 오류 메시지 |
 | started_at | DATETIME | YES | | 시작일 |
 | completed_at | DATETIME | YES | | 완료일 |

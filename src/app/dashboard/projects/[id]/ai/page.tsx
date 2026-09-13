@@ -9,6 +9,7 @@ import {
   isVideoResult,
   type AiDashboard,
   type AiPhotoResult,
+  type AiVideoJob,
   type SceneCategory,
 } from "@/types/ai";
 
@@ -17,8 +18,10 @@ export default function ProjectAiPage() {
   const router = useRouter();
   const [data, setData] = useState<AiDashboard | null>(null);
   const [previews, setPreviews] = useState<Record<number, string>>({});
+  const [highlightUrl, setHighlightUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [makingVideo, setMakingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -67,6 +70,29 @@ export default function ProjectAiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.latestJob?.id]);
 
+  useEffect(() => {
+    const path = data?.latestVideoJob?.contentPath;
+    if (!path || data?.latestVideoJob?.status !== "COMPLETED") {
+      setHighlightUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const blob = await apiFetchBlob(path);
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setHighlightUrl(objectUrl);
+      } catch {
+        if (!cancelled) setHighlightUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [data?.latestVideoJob?.id, data?.latestVideoJob?.status, data?.latestVideoJob?.contentPath]);
+
   async function runAnalyze() {
     setRunning(true);
     setError(null);
@@ -81,6 +107,26 @@ export default function ProjectAiPage() {
       setError(err instanceof Error ? err.message : "분석 실패");
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function runHighlight() {
+    setMakingVideo(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await apiFetch<AiVideoJob>(`/api/projects/${params.id}/ai/video`, {
+        method: "POST",
+      });
+      const dash = await load();
+      if (dash) {
+        setData({ ...dash, latestVideoJob: res.data ?? dash.latestVideoJob });
+      }
+      setMessage(res.message ?? "하이라이트 영상이 생성되었습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "영상 생성 실패");
+    } finally {
+      setMakingVideo(false);
     }
   }
 
@@ -112,14 +158,24 @@ export default function ProjectAiPage() {
               : " (Gemini 연동)"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void runAnalyze()}
-          disabled={running}
-          className="rounded-full bg-accent px-6 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-60"
-        >
-          {running ? "분석 중..." : "AI 분석 실행"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void runAnalyze()}
+            disabled={running || makingVideo}
+            className="rounded-full bg-accent px-6 py-3 text-sm text-white transition hover:opacity-90 disabled:opacity-60"
+          >
+            {running ? "분석 중..." : "AI 분석 실행"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runHighlight()}
+            disabled={running || makingVideo || !data?.bestShots?.length}
+            className="rounded-full border border-accent/40 bg-white px-6 py-3 text-sm text-accent transition hover:bg-accent/5 disabled:opacity-60"
+          >
+            {makingVideo ? "영상 생성 중..." : "하이라이트 영상 생성"}
+          </button>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
@@ -147,6 +203,37 @@ export default function ProjectAiPage() {
         <p className="mb-10 text-sm text-muted">
           아직 분석 결과가 없습니다. 갤러리에 사진·영상이 있다면 분석을 실행해 보세요.
         </p>
+      )}
+
+      {data?.latestVideoJob && (
+        <section className="mb-10 rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <h2 className="mb-2 text-lg font-medium">하이라이트 영상</h2>
+          <p className="mb-3 text-sm text-muted">
+            Job #{data.latestVideoJob.id} · {data.latestVideoJob.status}
+            {data.latestVideoJob.clipCount
+              ? ` · Best Shot ${data.latestVideoJob.clipCount}장`
+              : ""}
+            {data.latestVideoJob.fileSize
+              ? ` · ${(data.latestVideoJob.fileSize / (1024 * 1024)).toFixed(1)} MB`
+              : ""}
+          </p>
+          {data.latestVideoJob.errorMessage && (
+            <p className="mb-2 text-sm text-red-600">{data.latestVideoJob.errorMessage}</p>
+          )}
+          {highlightUrl && data.latestVideoJob.status === "COMPLETED" ? (
+            <video
+              key={highlightUrl}
+              src={highlightUrl}
+              controls
+              className="w-full max-w-xl rounded-xl bg-black"
+            />
+          ) : data.latestVideoJob.status === "COMPLETED" ? (
+            <p className="text-sm text-muted">영상 로딩 중...</p>
+          ) : null}
+          <p className="mt-2 text-xs text-muted">
+            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 저장은 후속(FR-AI-007).
+          </p>
+        </section>
       )}
 
       {data?.bestShots && data.bestShots.length > 0 && (

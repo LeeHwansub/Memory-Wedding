@@ -1,6 +1,6 @@
 # AI 분석 (장면 분류 · Best Shot · 동영상)
 
-> 브랜치: `feat/ai-video-analysis`  
+> 브랜치: `feat/ai-highlight-video`  
 > 참조: [Notion 요구사항](https://chip-sail-0e6.notion.site/Memory-Wedding-38f14c71cd4f806abfedef0e05f55306) · `docs/requirements-spec.md` FR-AI-001~018
 
 ## 1. 개요
@@ -19,7 +19,7 @@
 | FR-AI-003 | 동영상 분석 | ✅ 프레임 추출 + 장면 집계 |
 | FR-AI-004 | 장면 분류 | ✅ |
 | FR-AI-005 | 대표 장면(Best Shot) 선정 | ✅ 임계값 이상만 |
-| FR-AI-006~010 | 영상 생성·Drive·진행·알림·재생성 | ❌ 후속 |
+| FR-AI-006~010 | 영상 생성·Drive·진행·알림·재생성 | △ 006 하이라이트 생성 ✅ / Drive·알림 후속 |
 | FR-AI-011 | AI 분석 결과 조회 | ✅ |
 | FR-AI-012~018 | BGM·자막·스타일 등 | ❌ 후속 |
 
@@ -69,8 +69,11 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 
 | Method | Path | 설명 |
 |--------|------|------|
-| GET | `/api/projects/{id}/ai` | 최근 Job + 결과 + Best Shot |
+| GET | `/api/projects/{id}/ai` | 최근 분석 Job + 결과 + Best Shot + 하이라이트 Job |
 | POST | `/api/projects/{id}/ai/analyze` | 사진·영상 분석 (동기) |
+| GET | `/api/projects/{id}/ai/video` | 최근 하이라이트 Job |
+| POST | `/api/projects/{id}/ai/video` | Best Shot 사진 슬라이드쇼 MP4 생성 (동기, Drive 미저장) |
+| GET | `/api/projects/{id}/ai/video/{jobId}/content` | 생성된 MP4 스트리밍 |
 
 설정:
 - `GEMINI_API_KEY` / `GEMINI_MODEL` (default `gemini-2.5-flash`)
@@ -85,15 +88,30 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 
 | 경로 | 역할 |
 |------|------|
-| `/dashboard/projects/[id]/ai` | 분석 실행·Best Shot·장면 그리드·영상은 VIDEO 카드 |
+| `/dashboard/projects/[id]/ai` | 분석·Best Shot·장면 그리드·하이라이트 생성/재생 |
 
-## 8. Docker
+## 8. 하이라이트 영상 (FR-AI-006)
+
+1. 최근 분석 Job의 Best Shot 중 **PHOTO**만 사용
+2. **예식 흐름 순서:** 입장 → 축가 → 단체사진 → 피로연 → 기타 (같은 장면은 confidence 높은 순)
+3. FFmpeg 자동 편집 (2-pass):
+   - 장당 **고정 길이 클립** 렌더 (Ken Burns 줌 + 페이드 인/아웃)
+   - 클립을 concat (타임스탬프 꼬임으로 긴 검은 화면이 생기던 xfade 단일 그래프 제거)
+   - 1280×720, 장당 약 3.2초
+   - 최종 길이 ≈ Best Shot 사진 수 × 3.2초
+4. `ai_video_job` 저장 + ObjectStorage(`ai-highlight/{projectId}/...mp4`)
+5. **Drive 업로드는 FR-AI-007 후속** (`drive_file_id`는 비움)
+
+재생: AI 페이지에서 생성 후 `<video>`로 미리보기.
+
+## 9. Docker
 
 backend 이미지에 `ffmpeg` 패키지 포함 (`backend/Dockerfile`).
 
-## 9. 후속
+## 10. 후속
 
-- FR-AI-006~010 FFmpeg 하이라이트 영상 + Drive 결과물 저장
+- FR-AI-007 Drive AI/Archive 저장
+- FR-AI-008~010 진행률·알림·재생성 UX
+- BGM·자막·스타일 (FR-AI-012~015)
 - 비동기 Queue (NFR-003)
-- 영상 미리보기 스트리밍
-- FR-AI-012~018
+- 영상 클립을 하이라이트에 포함
