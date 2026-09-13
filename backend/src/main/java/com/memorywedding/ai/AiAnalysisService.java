@@ -48,6 +48,7 @@ public class AiAnalysisService {
     private final AiPhotoResultRepository aiPhotoResultRepository;
     private final ObjectStorage objectStorage;
     private final PhotoSceneAnalyzer photoSceneAnalyzer;
+    private final VideoFrameExtractor videoFrameExtractor;
     private final GeminiProperties geminiProperties;
     private final ObjectMapper objectMapper;
 
@@ -60,12 +61,24 @@ public class AiAnalysisService {
         List<UploadFile> photos = uploadFileRepository
                 .findByProject_IdAndFileTypeAndUploadStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
                         projectId, FileType.PHOTO, UploadStatus.COMPLETED);
-        if (photos.isEmpty()) {
-            throw new BadRequestException("분석할 완료된 사진이 없습니다. 하객 업로드 후 다시 시도해 주세요.");
+        List<UploadFile> videos = uploadFileRepository
+                .findByProject_IdAndFileTypeAndUploadStatusAndDeletedAtIsNullOrderByCreatedAtAsc(
+                        projectId, FileType.VIDEO, UploadStatus.COMPLETED);
+
+        int photoLimit = Math.max(1, geminiProperties.getMaxPhotos());
+        int videoLimit = Math.max(0, geminiProperties.getMaxVideos());
+        List<UploadFile> photoTargets =
+                photos.size() > photoLimit ? photos.subList(0, photoLimit) : photos;
+        List<UploadFile> videoTargets =
+                videos.size() > videoLimit ? videos.subList(0, videoLimit) : videos;
+
+        if (photoTargets.isEmpty() && videoTargets.isEmpty()) {
+            throw new BadRequestException("분석할 완료된 사진·영상이 없습니다. 하객 업로드 후 다시 시도해 주세요.");
         }
 
-        int limit = Math.max(1, geminiProperties.getMaxPhotos());
-        List<UploadFile> targets = photos.size() > limit ? photos.subList(0, limit) : photos;
+        List<UploadFile> targets = new ArrayList<>(photoTargets.size() + videoTargets.size());
+        targets.addAll(photoTargets);
+        targets.addAll(videoTargets);
 
         AiAnalysisJob job = aiAnalysisJobRepository.save(
                 AiAnalysisJob.builder().project(project).requestedBy(member).build());
@@ -75,25 +88,11 @@ public class AiAnalysisService {
         int index = 0;
         for (UploadFile file : targets) {
             try {
-                byte[] bytes = readBytes(file);
-                PhotoSceneAnalyzer.Analysis analysis = photoSceneAnalyzer.analyze(
-                        bytes, file.getMimeType(), file.getOriginalFilename(), index);
-                String metadata = buildMetadataJson(analysis);
-
-                AiPhotoResult result = aiPhotoResultRepository.findByUploadFile_Id(file.getId())
-                        .map(existing -> {
-                            existing.rebind(job, analysis.category(), false, analysis.confidence(), metadata);
-                            return existing;
-                        })
-                        .orElseGet(() -> AiPhotoResult.builder()
-                                .job(job)
-                                .uploadFile(file)
-                                .sceneCategory(analysis.category())
-                                .bestShot(false)
-                                .confidence(analysis.confidence())
-                                .metadataJson(metadata)
-                                .build());
-                draft.add(aiPhotoResultRepository.save(result));
+                if (file.getFileType() == FileType.VIDEO) {
+                    analyzeVideo(job, file, index, draft);
+                } else {
+                    analyzePhoto(job, file, index, draft);
+                }
                 job.incrementProcessed();
             } catch (Exception e) {
                 log.warn("Skip AI for upload {}: {}", file.getId(), e.getMessage());
@@ -105,12 +104,108 @@ public class AiAnalysisService {
         draft.forEach(aiPhotoResultRepository::save);
 
         if (job.getProcessedFiles() == 0) {
-            job.markFailed("분석에 성공한 사진이 없습니다.");
+            job.markFailed("분석에 성공한 사진·영상이 없습니다.");
         } else {
             job.markCompleted();
         }
 
         return toDashboard(projectId, job);
+    }
+
+    private void analyzePhoto(AiAnalysisJob job, UploadFile file, int index, List<AiPhotoResult> draft)
+            throws Exception {
+        byte[] bytes = readBytes(file);
+        PhotoSceneAnalyzer.Analysis analysis = photoSceneAnalyzer.analyze(
+                bytes, file.getMimeType(), file.getOriginalFilename(), index);
+        String metadata = buildMetadataJson(analysis, null, null);
+        draft.add(saveResult(job, file, analysis.category(), analysis.confidence(), metadata));
+    }
+
+    private void analyzeVideo(AiAnalysisJob job, UploadFile file, int index, List<AiPhotoResult> draft)
+            throws Exception {
+        byte[] videoBytes = readBytes(file);
+        int frameTarget = Math.max(1, geminiProperties.getVideoFrames());
+        List<byte[]> frames = videoFrameExtractor.extractFrames(videoBytes, frameTarget);
+        if (frames.isEmpty()) {
+            // FFmpeg 없거나 실패 시 mock 한 장 분량으로 폴백 (파일명 기반)
+            PhotoSceneAnalyzer.Analysis fallback = photoSceneAnalyzer.analyze(
+                    new byte[0], "image/jpeg", file.getOriginalFilename(), index);
+            String metadata = buildMetadataJson(fallback, 0, List.of());
+            draft.add(saveResult(job, file, fallback.category(), fallback.confidence(), metadata));
+            return;
+        }
+
+        List<PhotoSceneAnalyzer.Analysis> frameAnalyses = new ArrayList<>();
+        List<Map<String, Object>> frameScenes = new ArrayList<>();
+        int frameIndex = 0;
+        for (byte[] frame : frames) {
+            PhotoSceneAnalyzer.Analysis analysis = photoSceneAnalyzer.analyze(
+                    frame, "image/jpeg", file.getOriginalFilename() + "#frame" + frameIndex, index + frameIndex);
+            frameAnalyses.add(analysis);
+            Map<String, Object> scene = new LinkedHashMap<>();
+            scene.put("index", frameIndex);
+            scene.put("category", analysis.category().name());
+            scene.put("confidence", analysis.confidence());
+            frameScenes.add(scene);
+            frameIndex += 1;
+        }
+
+        AggregatedVideoAnalysis aggregated = aggregateVideoFrames(frameAnalyses);
+        String metadata = buildMetadataJson(aggregated.representative(), frames.size(), frameScenes);
+        draft.add(saveResult(
+                job, file, aggregated.category(), aggregated.confidence(), metadata));
+    }
+
+    private AggregatedVideoAnalysis aggregateVideoFrames(List<PhotoSceneAnalyzer.Analysis> frames) {
+        Map<SceneCategory, Integer> votes = new EnumMap<>(SceneCategory.class);
+        Map<SceneCategory, BigDecimal> maxConfidence = new EnumMap<>(SceneCategory.class);
+        Map<SceneCategory, PhotoSceneAnalyzer.Analysis> bestOfScene = new EnumMap<>(SceneCategory.class);
+
+        for (PhotoSceneAnalyzer.Analysis analysis : frames) {
+            SceneCategory category = analysis.category();
+            votes.merge(category, 1, Integer::sum);
+            BigDecimal conf = analysis.confidence() == null ? BigDecimal.ZERO : analysis.confidence();
+            BigDecimal prev = maxConfidence.getOrDefault(category, BigDecimal.ZERO);
+            if (conf.compareTo(prev) >= 0) {
+                maxConfidence.put(category, conf);
+                bestOfScene.put(category, analysis);
+            }
+        }
+
+        SceneCategory winner = votes.entrySet().stream()
+                .max(Comparator
+                        .<Map.Entry<SceneCategory, Integer>>comparingInt(Map.Entry::getValue)
+                        .thenComparing(e -> maxConfidence.getOrDefault(e.getKey(), BigDecimal.ZERO)))
+                .map(Map.Entry::getKey)
+                .orElse(SceneCategory.OTHER);
+
+        PhotoSceneAnalyzer.Analysis representative = bestOfScene.getOrDefault(
+                winner,
+                frames.get(0));
+        BigDecimal confidence = maxConfidence.getOrDefault(winner, BigDecimal.valueOf(0.5));
+        return new AggregatedVideoAnalysis(winner, confidence, representative);
+    }
+
+    private AiPhotoResult saveResult(
+            AiAnalysisJob job,
+            UploadFile file,
+            SceneCategory category,
+            BigDecimal confidence,
+            String metadata) {
+        AiPhotoResult result = aiPhotoResultRepository.findByUploadFile_Id(file.getId())
+                .map(existing -> {
+                    existing.rebind(job, category, false, confidence, metadata);
+                    return existing;
+                })
+                .orElseGet(() -> AiPhotoResult.builder()
+                        .job(job)
+                        .uploadFile(file)
+                        .sceneCategory(category)
+                        .bestShot(false)
+                        .confidence(confidence)
+                        .metadataJson(metadata)
+                        .build());
+        return aiPhotoResultRepository.save(result);
     }
 
     @Transactional(readOnly = true)
@@ -198,13 +293,22 @@ public class AiAnalysisService {
         );
     }
 
-    private String buildMetadataJson(PhotoSceneAnalyzer.Analysis analysis) throws Exception {
+    private String buildMetadataJson(
+            PhotoSceneAnalyzer.Analysis analysis,
+            Integer frameCount,
+            List<Map<String, Object>> frameScenes) throws Exception {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("provider", analysis.provider());
         metadata.put("note", analysis.note() == null ? "" : analysis.note());
         metadata.put("people", analysis.people() == null ? List.of() : analysis.people());
         metadata.put("objects", analysis.objects() == null ? List.of() : analysis.objects());
         metadata.put("place", analysis.place() == null ? "" : analysis.place());
+        if (frameCount != null) {
+            metadata.put("frameCount", frameCount);
+        }
+        if (frameScenes != null) {
+            metadata.put("frameScenes", frameScenes);
+        }
         return objectMapper.writeValueAsString(metadata);
     }
 
@@ -217,28 +321,34 @@ public class AiAnalysisService {
                 file.getOriginalFilename(),
                 file.getGuestName(),
                 "/api/projects/" + projectId + "/uploads/" + file.getId() + "/content",
+                file.getFileType(),
                 result.getSceneCategory(),
                 result.isBestShot(),
                 result.getConfidence(),
                 metadata.people(),
                 metadata.objects(),
                 metadata.place(),
+                metadata.frameCount(),
                 result.getAnalyzedAt()
         );
     }
 
     private MetadataView parseMetadata(String metadataJson) {
         if (metadataJson == null || metadataJson.isBlank()) {
-            return new MetadataView(List.of(), List.of(), "");
+            return new MetadataView(List.of(), List.of(), "", null);
         }
         try {
             JsonNode node = objectMapper.readTree(metadataJson);
+            Integer frameCount = node.has("frameCount") && node.path("frameCount").isNumber()
+                    ? node.path("frameCount").asInt()
+                    : null;
             return new MetadataView(
                     readStringList(node.path("people")),
                     readStringList(node.path("objects")),
-                    node.path("place").asText(""));
+                    node.path("place").asText(""),
+                    frameCount);
         } catch (Exception e) {
-            return new MetadataView(List.of(), List.of(), "");
+            return new MetadataView(List.of(), List.of(), "", null);
         }
     }
 
@@ -255,7 +365,14 @@ public class AiAnalysisService {
         return values;
     }
 
-    private record MetadataView(List<String> people, List<String> objects, String place) {
+    private record MetadataView(
+            List<String> people, List<String> objects, String place, Integer frameCount) {
+    }
+
+    private record AggregatedVideoAnalysis(
+            SceneCategory category,
+            BigDecimal confidence,
+            PhotoSceneAnalyzer.Analysis representative) {
     }
 
     private WeddingProject getOwnedProject(Long memberId, Long projectId) {

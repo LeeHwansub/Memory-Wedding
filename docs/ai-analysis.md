@@ -1,26 +1,27 @@
-# AI 분석 (장면 분류 · Best Shot)
+# AI 분석 (장면 분류 · Best Shot · 동영상)
 
-> 브랜치: `feat/ai-confidence-filter`  
+> 브랜치: `feat/ai-video-analysis`  
 > 참조: [Notion 요구사항](https://chip-sail-0e6.notion.site/Memory-Wedding-38f14c71cd4f806abfedef0e05f55306) · `docs/requirements-spec.md` FR-AI-001~018
 
 ## 1. 개요
 
-하객이 업로드한 **완료된 사진**을 AI Vision으로 분석하고, Notion FR-AI-004 기준 장면별로 분류한 뒤 장면마다 Best Shot을 선정한다.  
-**confidence가 `GEMINI_MIN_CONFIDENCE` 미만인 사진은 장면 분류·Best Shot에서 제외**한다 (원본은 갤러리 / Drive `Photos/{이름}/`에 그대로 유지).  
-`GEMINI_API_KEY`가 없으면 **mock 휴리스틱**으로 동작해 로컬에서도 흐름을 검증할 수 있다.
+하객이 업로드한 **완료된 사진·영상**을 AI Vision으로 분석하고, Notion FR-AI-004 기준 장면별로 분류한 뒤 장면마다 Best Shot을 선정한다.  
+영상은 FFmpeg로 균등 프레임을 추출한 뒤 프레임별 분류 → **장면 다수결 + 해당 장면 max confidence**로 집계한다.  
+**confidence가 `GEMINI_MIN_CONFIDENCE` 미만인 항목은 장면 분류·Best Shot에서 제외**한다 (원본은 갤러리 / Drive `Photos|Videos/{이름}/`에 그대로 유지).  
+`GEMINI_API_KEY`가 없으면 **mock 휴리스틱**으로 동작한다.
 
-## 2. Notion FR 대응 (1차 구현)
+## 2. Notion FR 대응
 
 | FR | 기능 | 상태 |
 |----|------|------|
-| FR-AI-001 | AI 분석 요청 | ✅ 수동 실행 |
-| FR-AI-002 | 사진 분석 (인물·객체·장소) | ✅ `people` / `objects` / `place` |
-| FR-AI-003 | 동영상 분석 | ❌ 후속 |
-| FR-AI-004 | 장면 분류 | ✅ Notion 카테고리 |
-| FR-AI-005 | 대표 장면(Best Shot) 선정 | ✅ 장면별 confidence 최대 (임계값 이상만) |
+| FR-AI-001 | AI 분석 요청 | ✅ 수동 실행 (사진+영상) |
+| FR-AI-002 | 사진 분석 (인물·객체·장소) | ✅ |
+| FR-AI-003 | 동영상 분석 | ✅ 프레임 추출 + 장면 집계 |
+| FR-AI-004 | 장면 분류 | ✅ |
+| FR-AI-005 | 대표 장면(Best Shot) 선정 | ✅ 임계값 이상만 |
 | FR-AI-006~010 | 영상 생성·Drive·진행·알림·재생성 | ❌ 후속 |
 | FR-AI-011 | AI 분석 결과 조회 | ✅ |
-| FR-AI-012~018 | BGM·자막·스타일·중복제거 등 | ❌ 후속 |
+| FR-AI-012~018 | BGM·자막·스타일 등 | ❌ 후속 |
 
 ## 3. 장면 카테고리 (FR-AI-004)
 
@@ -32,54 +33,67 @@
 | `RECEPTION` | 피로연 |
 | `OTHER` | 기타 |
 
-## 4. 사진 분석 메타데이터 (FR-AI-002)
+## 4. 동영상 분석 (FR-AI-003)
 
-`ai_photo_result.metadata_json` 예시:
+1. `COMPLETED` VIDEO 최대 `GEMINI_MAX_VIDEOS`개
+2. FFmpeg로 최대 `GEMINI_VIDEO_FRAMES`장 JPEG 균등 추출
+3. 프레임마다 Gemini/mock 분류
+4. 장면 **다수결**, confidence는 채택 장면의 **최대값**
+5. `ai_photo_result`에 1행 저장 (`upload_file` 1:1, VIDEO도 동일 테이블)
+
+`metadata_json` 예시 (영상):
 
 ```json
 {
   "provider": "gemini",
   "note": "gemini-2.5-flash",
   "people": ["신랑", "신부"],
-  "objects": ["부케", "촛불"],
-  "place": "예식장"
+  "objects": ["부케"],
+  "place": "예식장",
+  "frameCount": 5,
+  "frameScenes": [
+    { "index": 0, "category": "ENTRANCE", "confidence": 0.82 },
+    { "index": 1, "category": "ENTRANCE", "confidence": 0.77 }
+  ]
 }
 ```
+
+FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴백 (Job 전체 실패 아님).
 
 ## 5. 데이터
 
 - `ai_analysis_job` — 요청·상태·처리 건수
-- `ai_photo_result` — 파일당 장면·confidence·bestShot·metadata (`upload_file_id` UNIQUE)
+- `ai_photo_result` — PHOTO/VIDEO 공통 (`upload_file_id` UNIQUE). VIDEO는 `metadata.frameCount`로 구분
 
 ## 6. API
 
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/api/projects/{id}/ai` | 최근 Job + 결과 + Best Shot |
-| POST | `/api/projects/{id}/ai/analyze` | 분석 실행 (동기, 최대 N장) |
+| POST | `/api/projects/{id}/ai/analyze` | 사진·영상 분석 (동기) |
 
 설정:
-- `app.gemini.api-key` ← `GEMINI_API_KEY`
-- `app.gemini.model` ← `GEMINI_MODEL` (default `gemini-2.5-flash`)
-- `app.gemini.max-photos` ← `GEMINI_MAX_PHOTOS` (default 20)
-- `app.gemini.min-confidence` ← `GEMINI_MIN_CONFIDENCE` (default `0.60`)
+- `GEMINI_API_KEY` / `GEMINI_MODEL` (default `gemini-2.5-flash`)
+- `GEMINI_MAX_PHOTOS` (default 20)
+- `GEMINI_MIN_CONFIDENCE` (default 0.60)
+- `GEMINI_MAX_VIDEOS` (default 5)
+- `GEMINI_VIDEO_FRAMES` (default 5)
 
-대시보드 응답 추가 필드:
-- `minConfidence` — 적용 중인 임계값
-- `excludedCount` — 임계값 미만으로 분류에서 빠진 장수
-- `results` / `bestShots` — 임계값 **이상**만 포함
+대시보드 필드: `minConfidence`, `excludedCount`, `fileType`, `frameCount`
 
 ## 7. Frontend
 
 | 경로 | 역할 |
 |------|------|
-| `/dashboard/projects/[id]/ai` | 분석 실행·Best Shot·장면별 그리드·제외 건수 안내 |
+| `/dashboard/projects/[id]/ai` | 분석 실행·Best Shot·장면 그리드·영상은 VIDEO 카드 |
 
-Drive `AI/` 폴더로 장면별 복사는 하지 않는다. 원본은 기존 `Photos/{guest}/` 경로만 사용한다.
+## 8. Docker
 
-## 8. 후속
+backend 이미지에 `ffmpeg` 패키지 포함 (`backend/Dockerfile`).
 
-- FR-AI-003 동영상 장면 추출
+## 9. 후속
+
 - FR-AI-006~010 FFmpeg 하이라이트 영상 + Drive 결과물 저장
 - 비동기 Queue (NFR-003)
-- FR-AI-012~018 BGM·자막·스타일·중복 제거 등
+- 영상 미리보기 스트리밍
+- FR-AI-012~018

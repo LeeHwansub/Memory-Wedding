@@ -6,6 +6,7 @@ import { apiFetch, apiFetchBlob } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
   SCENE_LABELS,
+  isVideoResult,
   type AiDashboard,
   type AiPhotoResult,
   type SceneCategory,
@@ -40,7 +41,9 @@ export default function ProjectAiPage() {
   useEffect(() => {
     if (!data?.results?.length) return;
     let cancelled = false;
-    const targets = [...data.bestShots, ...data.results].slice(0, 24);
+    const targets = [...data.bestShots, ...data.results]
+      .filter((item) => !isVideoResult(item))
+      .slice(0, 24);
 
     (async () => {
       const next: Record<number, string> = {};
@@ -102,8 +105,8 @@ export default function ProjectAiPage() {
             AI 분석
           </h1>
           <p className="mt-2 text-sm text-muted">
-            하객 업로드 사진을 분석해 입장·축가·단체사진·피로연 등으로 분류하고 Best Shot을
-            고릅니다. 일치율(confidence)이 낮은 사진은 분류에서 제외됩니다.
+            하객 업로드 사진·영상을 분석해 입장·축가·단체사진·피로연 등으로 분류하고 Best Shot을
+            고릅니다. 일치율(confidence)이 낮은 항목은 분류에서 제외됩니다.
             {data?.analyzerMode === "mock"
               ? " (현재 mock 모드 — GEMINI_API_KEY 설정 시 Gemini 사용)"
               : " (Gemini 연동)"}
@@ -131,7 +134,7 @@ export default function ProjectAiPage() {
           <p className="mt-1 text-muted">
             분류 기준 confidence ≥ {Math.round((data.minConfidence ?? 0.6) * 100)}%
             {data.excludedCount > 0
-              ? ` · 제외 ${data.excludedCount}장 (원본 갤러리/Drive Photos 유지)`
+              ? ` · 제외 ${data.excludedCount}건 (원본 갤러리/Drive 유지)`
               : ""}
           </p>
           {data.latestJob.errorMessage && (
@@ -142,7 +145,7 @@ export default function ProjectAiPage() {
 
       {!data?.latestJob && (
         <p className="mb-10 text-sm text-muted">
-          아직 분석 결과가 없습니다. 갤러리에 사진이 있다면 분석을 실행해 보세요.
+          아직 분석 결과가 없습니다. 갤러리에 사진·영상이 있다면 분석을 실행해 보세요.
         </p>
       )}
 
@@ -201,10 +204,22 @@ function ResultCard({
   preview?: string;
   badge?: boolean;
 }) {
+  const video = isVideoResult(item);
+
   return (
     <article className="overflow-hidden rounded-xl border border-accent/20 bg-white">
       <div className="relative aspect-square bg-accent-soft">
-        {preview ? (
+        {video ? (
+          <div className="flex h-full flex-col items-center justify-center gap-1 px-3 text-center">
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] text-accent">
+              VIDEO
+            </span>
+            <p className="line-clamp-3 text-[11px] text-muted">{item.originalFilename}</p>
+            {item.frameCount != null && (
+              <p className="text-[10px] text-muted">{item.frameCount}프레임 분석</p>
+            )}
+          </div>
+        ) : preview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={preview} alt="" className="h-full w-full object-cover" />
         ) : (
@@ -227,8 +242,12 @@ function ResultCard({
         {(item.people?.length || item.objects?.length || item.place) && (
           <p className="line-clamp-2 text-[10px] text-muted">
             {item.people?.length ? `인물: ${item.people.join(", ")}` : ""}
-            {item.objects?.length ? `${item.people?.length ? " · " : ""}객체: ${item.objects.join(", ")}` : ""}
-            {item.place ? `${item.people?.length || item.objects?.length ? " · " : ""}${item.place}` : ""}
+            {item.objects?.length
+              ? `${item.people?.length ? " · " : ""}객체: ${item.objects.join(", ")}`
+              : ""}
+            {item.place
+              ? `${item.people?.length || item.objects?.length ? " · " : ""}${item.place}`
+              : ""}
           </p>
         )}
       </div>
