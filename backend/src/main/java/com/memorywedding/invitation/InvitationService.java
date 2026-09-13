@@ -12,6 +12,7 @@ import com.memorywedding.domain.entity.InviteLink;
 import com.memorywedding.domain.entity.WeddingProject;
 import com.memorywedding.domain.enums.GalleryLayout;
 import com.memorywedding.domain.enums.InvitationMediaType;
+import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
 import com.memorywedding.domain.repository.InvitationMediaRepository;
@@ -76,6 +77,7 @@ public class InvitationService {
                 writeAccounts(accounts)
         );
         invitation.updateMediaSettings(
+                request.template(),
                 request.galleryLayout(),
                 request.galleryColumns(),
                 request.galleryImageSize(),
@@ -229,6 +231,9 @@ public class InvitationService {
                 project.getVenueName(),
                 project.getVenueAddress(),
                 project.getSlug(),
+                invitation.getTemplate() == null
+                        ? InvitationTemplate.CLASSIC
+                        : invitation.getTemplate(),
                 safeLayout(invitation),
                 safeColumns(invitation),
                 safeGallerySize(invitation),

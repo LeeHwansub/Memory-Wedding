@@ -7,10 +7,15 @@ import { InvitationImage } from "@/components/invitation/InvitationImage";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { toDatetimeLocalValue } from "@/lib/datetime";
+import {
+  getInvitationTemplate,
+  INVITATION_TEMPLATES,
+} from "@/lib/invitation-templates";
 import type {
   GalleryLayout,
   Invitation,
   InvitationMedia,
+  InvitationTemplate,
   MainPhotoPlacement,
   MediaDisplaySize,
 } from "@/types/invitation";
@@ -34,6 +39,7 @@ export default function InvitationDesignPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [template, setTemplate] = useState<InvitationTemplate>("CLASSIC");
   const [galleryLayout, setGalleryLayout] = useState<GalleryLayout>("SLIDER");
   const [galleryColumns, setGalleryColumns] = useState(2);
   const [galleryImageSize, setGalleryImageSize] = useState<MediaDisplaySize>("MD");
@@ -59,6 +65,7 @@ export default function InvitationDesignPage() {
   const savingRef = useRef(false);
 
   function settingsSnapshot(data: {
+    template: InvitationTemplate;
     galleryLayout: GalleryLayout;
     galleryColumns: number;
     galleryImageSize: MediaDisplaySize;
@@ -74,6 +81,7 @@ export default function InvitationDesignPage() {
 
   function applyInvitation(data: Invitation) {
     const next = {
+      template: data.template ?? "CLASSIC",
       galleryLayout: data.galleryLayout ?? "SLIDER",
       galleryColumns: data.galleryColumns ?? 2,
       galleryImageSize: data.galleryImageSize ?? "MD",
@@ -85,6 +93,7 @@ export default function InvitationDesignPage() {
       mainFocalY: data.mainFocalY ?? 50,
     };
     setInvitation(data);
+    setTemplate(next.template);
     setGalleryLayout(next.galleryLayout);
     setGalleryColumns(next.galleryColumns);
     setGalleryImageSize(next.galleryImageSize);
@@ -117,6 +126,7 @@ export default function InvitationDesignPage() {
     if (!savedSnapshot) return false;
     return (
       settingsSnapshot({
+        template,
         galleryLayout,
         galleryColumns,
         galleryImageSize,
@@ -130,6 +140,7 @@ export default function InvitationDesignPage() {
     );
   }, [
     savedSnapshot,
+    template,
     galleryLayout,
     galleryColumns,
     galleryImageSize,
@@ -155,6 +166,7 @@ export default function InvitationDesignPage() {
           title: invitation.title || undefined,
           greetingMessage: invitation.greetingMessage || undefined,
           accounts: invitation.accounts ?? [],
+          template,
           galleryLayout,
           galleryColumns,
           galleryImageSize,
@@ -190,6 +202,7 @@ export default function InvitationDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on settings dirty only
   }, [
     dirty,
+    template,
     galleryLayout,
     galleryColumns,
     galleryImageSize,
@@ -306,6 +319,18 @@ export default function InvitationDesignPage() {
     await persistGalleryOrder(next);
   }
 
+  function applyTemplate(nextId: InvitationTemplate) {
+    const def = getInvitationTemplate(nextId);
+    setTemplate(def.id);
+    setGalleryLayout(def.presets.galleryLayout);
+    setGalleryColumns(def.presets.galleryColumns);
+    setGalleryImageSize(def.presets.galleryImageSize);
+    setMainPhotoSize(def.presets.mainPhotoSize);
+    setMainPhotoPlacement(def.presets.mainPhotoPlacement);
+    setMainBrightness(def.presets.mainBrightness);
+    setMainSaturation(def.presets.mainSaturation);
+  }
+
   function setFocalFromClick(
     event: React.MouseEvent<HTMLButtonElement>,
   ) {
@@ -358,6 +383,7 @@ export default function InvitationDesignPage() {
   const preview = (
     <InvitationDesignPreview
       auth
+      template={template}
       groomName={invitation.groomName}
       brideName={invitation.brideName}
       title={invitation.title}
@@ -432,6 +458,42 @@ export default function InvitationDesignPage() {
             mobilePane === "edit" ? "block" : "hidden"
           }`}
         >
+          <section className="space-y-4">
+            <div>
+              <p className="text-sm font-medium">템플릿</p>
+              <p className="mt-1 text-xs text-muted">
+                색감·기본 레이아웃 프리셋을 적용합니다. 이후에도 세부 설정은 자유롭게 조정할 수 있습니다.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {INVITATION_TEMPLATES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => applyTemplate(item.id)}
+                  className={`overflow-hidden rounded-xl border text-left transition ${
+                    template === item.id
+                      ? "border-foreground ring-1 ring-foreground"
+                      : "border-accent/20"
+                  }`}
+                >
+                  <span
+                    className="block h-14 w-full"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.theme.bg} 0%, ${item.theme.soft} 45%, ${item.theme.accent} 100%)`,
+                    }}
+                  />
+                  <span className="block px-2 py-2">
+                    <span className="block text-xs font-medium">{item.name}</span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      {item.description}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="space-y-4">
             <div>
               <p className="text-sm font-medium">메인 사진</p>

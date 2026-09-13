@@ -42,7 +42,8 @@ export function GalleryCard({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="갤러리 보기"
-        className="group w-full overflow-hidden rounded-2xl border border-[#C9A87C]/25 bg-white transition hover:border-[#C9A87C]/50"
+        className="group w-full overflow-hidden rounded-2xl border bg-[var(--inv-bg,#fff)] transition"
+        style={{ borderColor: "var(--inv-line, rgba(201,168,124,0.25))" }}
       >
         <div
           className={`grid gap-0.5 ${
@@ -56,9 +57,10 @@ export function GalleryCard({
           {cover.map((item, index) => (
             <div
               key={item.id}
-              className={`relative overflow-hidden bg-[#F3EBE0] ${
+              className={`relative overflow-hidden ${
                 cover.length === 3 && index === 0 ? "col-span-2 aspect-[2/1]" : "aspect-square"
               } ${cover.length === 1 ? "aspect-[4/3]" : ""}`}
+              style={{ backgroundColor: "var(--inv-soft, #F3EBE0)" }}
             >
               <InvitationImage
                 auth={auth}
@@ -80,10 +82,14 @@ export function GalleryCard({
           onClick={() => setOpen(false)}
         >
           <div
-            className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#FAF8F5] shadow-xl"
+            className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl shadow-xl"
+            style={{ backgroundColor: "var(--inv-bg, #FAF8F5)", color: "var(--inv-fg, #2C2420)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#C9A87C]/20 px-4 py-3">
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: "1px solid var(--inv-line, rgba(201,168,124,0.2))" }}
+            >
               <p
                 className="text-sm tracking-wide"
                 style={{ fontFamily: "var(--font-playfair), serif" }}
