@@ -7,10 +7,8 @@ import { InvitationImage } from "@/components/invitation/InvitationImage";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { toDatetimeLocalValue } from "@/lib/datetime";
-import {
-  getInvitationTemplate,
-  INVITATION_TEMPLATES,
-} from "@/lib/invitation-templates";
+import { InvitationTemplatePicker } from "@/components/invitation/InvitationTemplatePicker";
+import { getInvitationTemplate } from "@/lib/invitation-templates";
 import type {
   GalleryLayout,
   Invitation,
@@ -61,6 +59,7 @@ export default function InvitationDesignPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>("edit");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [applyTemplatePresets, setApplyTemplatePresets] = useState(true);
   const skipAutoSave = useRef(true);
   const savingRef = useRef(false);
 
@@ -322,6 +321,7 @@ export default function InvitationDesignPage() {
   function applyTemplate(nextId: InvitationTemplate) {
     const def = getInvitationTemplate(nextId);
     setTemplate(def.id);
+    if (!applyTemplatePresets) return;
     setGalleryLayout(def.presets.galleryLayout);
     setGalleryColumns(def.presets.galleryColumns);
     setGalleryImageSize(def.presets.galleryImageSize);
@@ -458,41 +458,12 @@ export default function InvitationDesignPage() {
             mobilePane === "edit" ? "block" : "hidden"
           }`}
         >
-          <section className="space-y-4">
-            <div>
-              <p className="text-sm font-medium">템플릿</p>
-              <p className="mt-1 text-xs text-muted">
-                색감·기본 레이아웃 프리셋을 적용합니다. 이후에도 세부 설정은 자유롭게 조정할 수 있습니다.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {INVITATION_TEMPLATES.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => applyTemplate(item.id)}
-                  className={`overflow-hidden rounded-xl border text-left transition ${
-                    template === item.id
-                      ? "border-foreground ring-1 ring-foreground"
-                      : "border-accent/20"
-                  }`}
-                >
-                  <span
-                    className="block h-14 w-full"
-                    style={{
-                      background: `linear-gradient(135deg, ${item.theme.bg} 0%, ${item.theme.soft} 45%, ${item.theme.accent} 100%)`,
-                    }}
-                  />
-                  <span className="block px-2 py-2">
-                    <span className="block text-xs font-medium">{item.name}</span>
-                    <span className="mt-0.5 block text-[10px] text-muted">
-                      {item.description}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <InvitationTemplatePicker
+            value={template}
+            applyPresets={applyTemplatePresets}
+            onApplyPresetsChange={setApplyTemplatePresets}
+            onSelect={applyTemplate}
+          />
 
           <section className="space-y-4">
             <div>
@@ -784,8 +755,10 @@ export default function InvitationDesignPage() {
             mobilePane === "preview" ? "block" : "hidden"
           }`}
         >
-          <div className="mb-3 flex items-center justify-between lg:justify-center">
-            <p className="text-xs tracking-wide text-muted">미리보기</p>
+          <div className="mb-3 flex items-center justify-between lg:justify-center lg:gap-3">
+            <p className="text-xs tracking-wide text-muted">
+              미리보기 · {getInvitationTemplate(template).name}
+            </p>
             <button
               type="button"
               onClick={() => setMobilePane("edit")}

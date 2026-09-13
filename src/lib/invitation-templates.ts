@@ -148,6 +148,52 @@ export const INVITATION_TEMPLATES: InvitationTemplateDef[] = [
       mainSaturation: 1.1,
     },
   },
+  {
+    id: "SLATE",
+    name: "Slate",
+    description: "쿨 슬레이트·모던",
+    theme: {
+      bg: "#F3F5F7",
+      fg: "#1F2A33",
+      accent: "#5B7C99",
+      muted: "#7A8794",
+      soft: "#E6ECF1",
+      line: "rgba(91,124,153,0.35)",
+      heroOverlay: "linear-gradient(to top, rgba(31,42,51,0.5), rgba(31,42,51,0.15), transparent)",
+    },
+    presets: {
+      galleryLayout: "COLLAGE",
+      galleryColumns: 2,
+      galleryImageSize: "MD",
+      mainPhotoSize: "LG",
+      mainPhotoPlacement: "TOP",
+      mainBrightness: 1,
+      mainSaturation: 0.95,
+    },
+  },
+  {
+    id: "LINEN",
+    name: "Linen",
+    description: "린넨 텍스처 감성",
+    theme: {
+      bg: "#F7F4EE",
+      fg: "#2C2924",
+      accent: "#A09078",
+      muted: "#8A8378",
+      soft: "#EDE7DC",
+      line: "rgba(160,144,120,0.35)",
+      heroOverlay: "linear-gradient(to top, rgba(44,41,36,0.42), rgba(44,41,36,0.12), transparent)",
+    },
+    presets: {
+      galleryLayout: "VERTICAL",
+      galleryColumns: 2,
+      galleryImageSize: "MD",
+      mainPhotoSize: "MD",
+      mainPhotoPlacement: "MIDDLE",
+      mainBrightness: 1.05,
+      mainSaturation: 0.95,
+    },
+  },
 ];
 
 export function getInvitationTemplate(

@@ -13,7 +13,9 @@ export type InvitationTemplate =
   | "IVORY"
   | "NOIR"
   | "SAGE"
-  | "ROSE";
+  | "ROSE"
+  | "SLATE"
+  | "LINEN";
 
 export type InvitationMedia = {
   id: number;
