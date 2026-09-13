@@ -98,4 +98,8 @@ public class AiPhotoResult extends BaseTimeEntity {
     public void markBestShot() {
         this.bestShot = true;
     }
+
+    public void replaceMetadataJson(String metadataJson) {
+        this.metadataJson = metadataJson;
+    }
 }

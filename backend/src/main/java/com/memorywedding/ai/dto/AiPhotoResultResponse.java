@@ -20,6 +20,7 @@ public record AiPhotoResultResponse(
         List<String> objects,
         String place,
         Integer frameCount,
+        boolean duplicate,
         LocalDateTime analyzedAt
 ) {
 }

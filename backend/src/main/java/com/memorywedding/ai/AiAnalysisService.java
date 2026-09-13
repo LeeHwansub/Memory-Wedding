@@ -129,7 +129,8 @@ public class AiAnalysisService {
         byte[] bytes = readBytes(file);
         PhotoSceneAnalyzer.Analysis analysis = photoSceneAnalyzer.analyze(
                 bytes, file.getMimeType(), file.getOriginalFilename(), index);
-        String metadata = buildMetadataJson(analysis, null, null);
+        Long ahash = PhotoAverageHash.compute(bytes);
+        String metadata = buildMetadataJson(analysis, null, null, ahash, false);
         aiAnalysisWriteService.saveResult(
                 jobId, file, analysis.category(), analysis.confidence(), metadata);
     }
@@ -141,7 +142,7 @@ public class AiAnalysisService {
         if (frames.isEmpty()) {
             PhotoSceneAnalyzer.Analysis fallback = photoSceneAnalyzer.analyze(
                     new byte[0], "image/jpeg", file.getOriginalFilename(), index);
-            String metadata = buildMetadataJson(fallback, 0, List.of());
+            String metadata = buildMetadataJson(fallback, 0, List.of(), null, false);
             aiAnalysisWriteService.saveResult(
                     jobId, file, fallback.category(), fallback.confidence(), metadata);
             return;
@@ -163,7 +164,8 @@ public class AiAnalysisService {
         }
 
         AggregatedVideoAnalysis aggregated = aggregateVideoFrames(frameAnalyses);
-        String metadata = buildMetadataJson(aggregated.representative(), frames.size(), frameScenes);
+        String metadata = buildMetadataJson(
+                aggregated.representative(), frames.size(), frameScenes, null, false);
         aiAnalysisWriteService.saveResult(
                 jobId, file, aggregated.category(), aggregated.confidence(), metadata);
     }
@@ -224,6 +226,7 @@ public class AiAnalysisService {
                 .toList();
         List<AiPhotoResultResponse> results = all.stream()
                 .filter(this::meetsConfidence)
+                .filter(r -> !r.duplicate())
                 .toList();
         int excludedCount = all.size() - results.size();
         List<AiPhotoResultResponse> bestShots = results.stream()
@@ -272,7 +275,9 @@ public class AiAnalysisService {
     private String buildMetadataJson(
             PhotoSceneAnalyzer.Analysis analysis,
             Integer frameCount,
-            List<Map<String, Object>> frameScenes) throws Exception {
+            List<Map<String, Object>> frameScenes,
+            Long ahash,
+            boolean duplicate) throws Exception {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("provider", analysis.provider());
         metadata.put("note", analysis.note() == null ? "" : analysis.note());
@@ -285,6 +290,10 @@ public class AiAnalysisService {
         if (frameScenes != null) {
             metadata.put("frameScenes", frameScenes);
         }
+        if (ahash != null) {
+            metadata.put("ahash", PhotoAverageHash.toHex(ahash));
+        }
+        metadata.put("duplicate", duplicate);
         return objectMapper.writeValueAsString(metadata);
     }
 
@@ -305,26 +314,29 @@ public class AiAnalysisService {
                 metadata.objects(),
                 metadata.place(),
                 metadata.frameCount(),
+                metadata.duplicate(),
                 result.getAnalyzedAt()
         );
     }
 
     private MetadataView parseMetadata(String metadataJson) {
         if (metadataJson == null || metadataJson.isBlank()) {
-            return new MetadataView(List.of(), List.of(), "", null);
+            return new MetadataView(List.of(), List.of(), "", null, false);
         }
         try {
             JsonNode node = objectMapper.readTree(metadataJson);
             Integer frameCount = node.has("frameCount") && node.path("frameCount").isNumber()
                     ? node.path("frameCount").asInt()
                     : null;
+            boolean duplicate = node.has("duplicate") && node.path("duplicate").asBoolean(false);
             return new MetadataView(
                     readStringList(node.path("people")),
                     readStringList(node.path("objects")),
                     node.path("place").asText(""),
-                    frameCount);
+                    frameCount,
+                    duplicate);
         } catch (Exception e) {
-            return new MetadataView(List.of(), List.of(), "", null);
+            return new MetadataView(List.of(), List.of(), "", null, false);
         }
     }
 
@@ -342,7 +354,11 @@ public class AiAnalysisService {
     }
 
     private record MetadataView(
-            List<String> people, List<String> objects, String place, Integer frameCount) {
+            List<String> people,
+            List<String> objects,
+            String place,
+            Integer frameCount,
+            boolean duplicate) {
     }
 
     private record AggregatedVideoAnalysis(
