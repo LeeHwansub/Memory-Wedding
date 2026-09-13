@@ -58,7 +58,7 @@ public class AiController {
         Long memberId = (Long) authentication.getPrincipal();
         return ApiResponse.ok(
                 aiHighlightService.createHighlight(memberId, projectId),
-                "하이라이트 영상 생성을 완료했습니다.");
+                "하이라이트 영상 생성이 완료되었습니다.");
     }
 
     @GetMapping("/api/projects/{projectId}/ai/video/{jobId}/content")

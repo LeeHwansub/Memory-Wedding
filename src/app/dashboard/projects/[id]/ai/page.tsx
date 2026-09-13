@@ -13,6 +13,13 @@ import {
   type SceneCategory,
 } from "@/types/ai";
 
+const HIGHLIGHT_STEPS = [
+  "Best Shot 준비",
+  "클립 렌더 · 페이드/줌",
+  "영상 합성",
+  "Drive 저장(연동 시)",
+] as const;
+
 export default function ProjectAiPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -22,8 +29,10 @@ export default function ProjectAiPage() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [makingVideo, setMakingVideo] = useState(false);
+  const [progressStep, setProgressStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [justCompletedVideoId, setJustCompletedVideoId] = useState<number | null>(null);
 
   async function load() {
     const res = await apiFetch<AiDashboard>(`/api/projects/${params.id}/ai`);
@@ -93,6 +102,20 @@ export default function ProjectAiPage() {
     };
   }, [data?.latestVideoJob?.id, data?.latestVideoJob?.status, data?.latestVideoJob?.contentPath]);
 
+  useEffect(() => {
+    if (!makingVideo) {
+      setProgressStep(0);
+      return;
+    }
+    setProgressStep(0);
+    const timers = [
+      window.setTimeout(() => setProgressStep(1), 800),
+      window.setTimeout(() => setProgressStep(2), 2800),
+      window.setTimeout(() => setProgressStep(3), 5000),
+    ];
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [makingVideo]);
+
   async function runAnalyze() {
     setRunning(true);
     setError(null);
@@ -111,18 +134,33 @@ export default function ProjectAiPage() {
   }
 
   async function runHighlight() {
+    const existing = data?.latestVideoJob;
+    if (existing?.status === "COMPLETED") {
+      const ok = window.confirm(
+        "이미 하이라이트 영상이 있습니다. 새로 다시 생성할까요?\n(이전 서버 파일은 유지되며, Drive에는 새 파일이 추가됩니다)",
+      );
+      if (!ok) return;
+    }
+
     setMakingVideo(true);
     setError(null);
     setMessage(null);
+    setJustCompletedVideoId(null);
     try {
       const res = await apiFetch<AiVideoJob>(`/api/projects/${params.id}/ai/video`, {
         method: "POST",
       });
+      setProgressStep(HIGHLIGHT_STEPS.length - 1);
       const dash = await load();
       if (dash) {
         setData({ ...dash, latestVideoJob: res.data ?? dash.latestVideoJob });
       }
-      setMessage(res.message ?? "하이라이트 영상이 생성되었습니다.");
+      const jobId = res.data?.id ?? null;
+      if (jobId != null) setJustCompletedVideoId(jobId);
+      const driveNote = res.data?.driveSynced ? " Drive에도 저장했습니다." : "";
+      setMessage(
+        (res.message ?? "하이라이트 영상 생성이 완료되었습니다.") + driveNote,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "영상 생성 실패");
     } finally {
@@ -139,6 +177,7 @@ export default function ProjectAiPage() {
   }
 
   const grouped = groupByScene(data?.results ?? []);
+  const hasCompletedVideo = data?.latestVideoJob?.status === "COMPLETED";
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-10 sm:py-14">
@@ -173,13 +212,59 @@ export default function ProjectAiPage() {
             disabled={running || makingVideo || !data?.bestShots?.length}
             className="rounded-full border border-accent/40 bg-white px-6 py-3 text-sm text-accent transition hover:bg-accent/5 disabled:opacity-60"
           >
-            {makingVideo ? "영상 생성 중..." : "하이라이트 영상 생성"}
+            {makingVideo
+              ? "영상 생성 중..."
+              : hasCompletedVideo
+                ? "하이라이트 다시 생성"
+                : "하이라이트 영상 생성"}
           </button>
         </div>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
       {message && <p className="mb-4 text-sm text-green-700">{message}</p>}
+
+      {justCompletedVideoId != null &&
+        data?.latestVideoJob?.id === justCompletedVideoId &&
+        data.latestVideoJob.status === "COMPLETED" && (
+          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-800">
+            하이라이트 영상이 준비되었습니다. 아래에서 바로 재생할 수 있습니다.
+            {data.latestVideoJob.driveSynced
+              ? " Google Drive AI/Archive에도 저장되었습니다."
+              : ""}
+          </div>
+        )}
+
+      {makingVideo && (
+        <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <p className="mb-3 text-sm font-medium">영상 생성 진행</p>
+          <ol className="space-y-2 text-sm">
+            {HIGHLIGHT_STEPS.map((label, index) => {
+              const done = index < progressStep;
+              const current = index === progressStep;
+              return (
+                <li
+                  key={label}
+                  className={
+                    done
+                      ? "text-accent"
+                      : current
+                        ? "font-medium text-foreground"
+                        : "text-muted"
+                  }
+                >
+                  {done ? "✓ " : current ? "→ " : "· "}
+                  {label}
+                  {current ? "…" : ""}
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-xs text-muted">
+            생성 중에는 다시 요청할 수 없습니다. 완료까지 잠시 기다려 주세요.
+          </p>
+        </div>
+      )}
 
       {data?.latestJob && (
         <div className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4 text-sm">
@@ -234,9 +319,13 @@ export default function ProjectAiPage() {
             />
           ) : data.latestVideoJob.status === "COMPLETED" ? (
             <p className="text-sm text-muted">영상 로딩 중...</p>
+          ) : data.latestVideoJob.status === "PROCESSING" ||
+            data.latestVideoJob.status === "PENDING" ? (
+            <p className="text-sm text-muted">서버에서 영상을 생성 중입니다…</p>
           ) : null}
           <p className="mt-2 text-xs text-muted">
-            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 연결 시 AI/·Archive/에 함께 저장됩니다.
+            입장→축가→단체→피로연 순 · 페이드·줌 자동 편집. Drive 연결 시 AI/·Archive/에 함께
+            저장됩니다. 다시 생성하면 새 Job이 추가됩니다.
           </p>
         </section>
       )}
