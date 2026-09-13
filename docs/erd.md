@@ -173,7 +173,7 @@ erDiagram
 | 8 | `drive_connection` | Google Drive OAuth 연동 | ✅ |
 | 9 | `ai_analysis_job` | AI 사진 분석 작업 | ✅ (1차) |
 | 10 | `ai_photo_result` | AI 장면 분류·Best Shot 결과 | ✅ (1차) |
-| 11 | `ai_video_job` | FFmpeg 하이라이트 영상 작업 | ✅ (1차 · Drive AI/Archive) |
+| 11 | `ai_video_job` | FFmpeg 하이라이트 + Drive AI/Archive | ✅ (1차) |
 
 ---
 
@@ -357,7 +357,7 @@ VIDEO는 FFmpeg 프레임 분석 후 장면 다수결로 1행 저장한다.
 
 ---
 
-### 3.11 ai_video_job (1차 · Drive 저장 후속)
+### 3.11 ai_video_job (1차 · 하이라이트 + Drive AI/Archive)
 
 | 컬럼 | 타입 | Null | Key | 설명 |
 |------|------|------|-----|------|
@@ -422,8 +422,11 @@ DB에는 `wedding_project.drive_root_folder_id`와 `upload_file.drive_folder_pat
 | FR-GST-002~006 | upload_file |
 | FR-STR-001~005 | upload_file, drive_connection, wedding_project |
 | FR-GBK-001~004 | guestbook_entry |
-| FR-AI-001~006 | ai_analysis_job, ai_photo_result, ai_video_job |
+| FR-AI-001~005, 011 | ai_analysis_job, ai_photo_result |
+| FR-AI-006~010 | ai_video_job (+ Drive file id) |
 | FR-ADM-002~006 | member, wedding_project, ai_* |
+
+상세 동작: `docs/ai-analysis.md`
 
 ---
 
@@ -431,4 +434,5 @@ DB에는 `wedding_project.drive_root_folder_id`와 `upload_file.drive_folder_pat
 
 | 버전 | 일자 | 변경 내용 | 작성자 |
 |------|------|-----------|--------|
+| 1.1.0 | 2026-09-13 | AI 테이블 1차 완료·FR 매핑 갱신 | - |
 | 1.0.0 | 2026-09-10 | 초안 작성 | - |

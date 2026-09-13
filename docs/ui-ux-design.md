@@ -101,7 +101,7 @@ Memory Wedding
 | UI-USR-006 | 갤러리 | `/dashboard/projects/[id]/gallery` | 업로드 파일 그리드·삭제 | FR-STR-003, 004 |
 | UI-USR-007 | 방명록 관리 | `/dashboard/projects/[id]/guestbook` | 방명록 목록·삭제 | FR-GBK-002, 003 |
 | UI-USR-008 | 공유 | `/dashboard/projects/[id]/share` | 초대 URL, QR 다운로드 | FR-PRJ-006, 007 |
-| UI-USR-009 | AI 결과 | `/dashboard/projects/[id]/ai` | 장면 분류·Best Shot (MVP 이후) | FR-AI-003, 004 |
+| UI-USR-009 | AI 결과 | `/dashboard/projects/[id]/ai` | 장면 분류·Best Shot·하이라이트 생성/재생/재생성 | FR-AI-001~011 |
 | UI-USR-010 | 설정 | `/settings` | 프로필, 로그아웃, 탈퇴 | FR-MEM-003~006 |
 
 ### 3.3 하객 (GUEST)
