@@ -40,6 +40,8 @@ export type AiDashboard = {
   results: AiPhotoResult[];
   bestShots: AiPhotoResult[];
   analyzerMode: "gemini" | "mock" | string;
+  minConfidence: number;
+  excludedCount: number;
 };
 
 export const SCENE_LABELS: Record<SceneCategory, string> = {
