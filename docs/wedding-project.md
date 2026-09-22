@@ -47,7 +47,9 @@
 | `GET` | `/api/projects` | 내 Project 목록 |
 | `POST` | `/api/projects` | Project 생성 (+ Invitation, InviteLink) |
 | `GET` | `/api/projects/{id}` | 상세 |
-| `PUT` | `/api/projects/{id}` | 수정 |
+| `PUT` | `/api/projects/{id}` | 수정 (`greetingMessage` 포함 시 청첩장 인사말 동기화) |
+| `GET/POST/DELETE` | `/api/projects/{id}/bgm` | 프로젝트 BGM (하이라이트·청첩장 공용) |
+| `GET` | `/api/projects/{id}/bgm/content` | BGM 스트리밍 |
 | `DELETE` | `/api/projects/{id}` | Soft delete |
 | `PATCH` | `/api/projects/{id}/invite-link` | `{ "active": true/false }` |
 
@@ -79,7 +81,7 @@ backend/src/main/java/com/memorywedding/
 | `/dashboard` | Project 목록 / 생성 CTA |
 | `/dashboard/projects/new` | 생성 폼 |
 | `/dashboard/projects/[id]` | 상세 + 삭제 |
-| `/dashboard/projects/[id]/edit` | 수정 폼 |
+| `/dashboard/projects/[id]/edit` | 수정 폼 (소개글 + AI 추천) |
 | `/dashboard/projects/[id]/share` | 초대 URL 복사 + QR |
 
 ### 4.2 Daum 주소 API

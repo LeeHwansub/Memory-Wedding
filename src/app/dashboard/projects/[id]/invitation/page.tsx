@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { BankPicker } from "@/components/ui/BankPicker";
+import { ProjectBgmUploader, type ProjectBgm } from "@/components/project/ProjectBgmUploader";
 import { useProjectPreview } from "@/components/shell/ProjectShell";
 import { apiFetch } from "@/lib/api";
 import { findBankByName } from "@/lib/banks";
@@ -23,10 +24,12 @@ export default function InvitationEditPage() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [title, setTitle] = useState("");
   const [greetingMessage, setGreetingMessage] = useState("");
+  const [bgm, setBgm] = useState<ProjectBgm | null>(null);
   const [accounts, setAccounts] = useState<AccountEntry[]>([emptyAccount()]);
   const [bankPickerIndex, setBankPickerIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [recommending, setRecommending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -43,6 +46,7 @@ export default function InvitationEditPage() {
         setInvitation(data);
         setTitle(data.title ?? "");
         setGreetingMessage(data.greetingMessage ?? "");
+        setBgm(data.bgm ?? { uploaded: false });
         setAccounts(data.accounts?.length ? data.accounts : [emptyAccount()]);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "조회 실패"))
@@ -122,6 +126,34 @@ export default function InvitationEditPage() {
     }
   }
 
+  async function handleRecommendGreeting() {
+    setRecommending(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await apiFetch<{ greetingMessage: string }>(
+        `/api/projects/${params.id}/ai/greeting`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            groomName: invitation?.groomName,
+            brideName: invitation?.brideName,
+            venueName: invitation?.venueName || undefined,
+            weddingAt: invitation?.weddingAt,
+          }),
+        },
+      );
+      if (res.data?.greetingMessage) {
+        setGreetingMessage(res.data.greetingMessage);
+        setMessage("AI 추천 소개글을 반영했습니다. 저장을 눌러 주세요.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "소개글 추천 실패");
+    } finally {
+      setRecommending(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -192,7 +224,17 @@ export default function InvitationEditPage() {
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-muted">인사말</span>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-muted">인사말</span>
+            <button
+              type="button"
+              disabled={saving || recommending}
+              onClick={handleRecommendGreeting}
+              className="rounded-full border border-accent/30 px-3 py-1 text-xs disabled:opacity-50"
+            >
+              {recommending ? "추천 중..." : "AI 추천"}
+            </button>
+          </div>
           <textarea
             value={greetingMessage}
             onChange={(e) => setGreetingMessage(e.target.value)}
@@ -200,6 +242,14 @@ export default function InvitationEditPage() {
             className="w-full rounded-xl border border-accent/30 bg-white px-4 py-3"
           />
         </label>
+
+        <ProjectBgmUploader
+          projectId={params.id}
+          value={bgm}
+          onChange={setBgm}
+          disabled={saving}
+          hint="공개 청첩장에서 재생되며, 하이라이트 영상에도 사용할 수 있습니다."
+        />
 
         <section className="space-y-4">
           <p className="text-sm font-medium">축의금 계좌</p>

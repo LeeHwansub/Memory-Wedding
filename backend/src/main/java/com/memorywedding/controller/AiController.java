@@ -2,9 +2,12 @@ package com.memorywedding.controller;
 
 import com.memorywedding.ai.AiAnalysisService;
 import com.memorywedding.ai.AiHighlightService;
+import com.memorywedding.ai.GreetingAiService;
 import com.memorywedding.ai.dto.AiDashboardResponse;
 import com.memorywedding.ai.dto.AiVideoJobResponse;
 import com.memorywedding.ai.dto.CreateHighlightRequest;
+import com.memorywedding.ai.dto.GreetingRecommendRequest;
+import com.memorywedding.ai.dto.GreetingRecommendResponse;
 import com.memorywedding.common.ApiResponse;
 import com.memorywedding.domain.entity.AiVideoJob;
 import java.io.InputStream;
@@ -26,6 +29,7 @@ public class AiController {
 
     private final AiAnalysisService aiAnalysisService;
     private final AiHighlightService aiHighlightService;
+    private final GreetingAiService greetingAiService;
 
     @GetMapping("/api/projects/{projectId}/ai")
     public ApiResponse<AiDashboardResponse> dashboard(
@@ -62,6 +66,17 @@ public class AiController {
         return ApiResponse.ok(
                 aiHighlightService.createHighlight(memberId, projectId, request),
                 "하이라이트 영상 생성을 시작했습니다.");
+    }
+
+    @PostMapping("/api/projects/{projectId}/ai/greeting")
+    public ApiResponse<GreetingRecommendResponse> recommendGreeting(
+            Authentication authentication,
+            @PathVariable Long projectId,
+            @RequestBody(required = false) GreetingRecommendRequest request) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ApiResponse.ok(
+                greetingAiService.recommend(memberId, projectId, request),
+                "소개글 추천이 준비되었습니다.");
     }
 
     @GetMapping("/api/projects/{projectId}/ai/video/{jobId}/content")

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProjectBgmUploader, type ProjectBgm } from "@/components/project/ProjectBgmUploader";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
@@ -73,12 +74,20 @@ export default function ProjectAiPage() {
   const [style, setStyle] = useState<HighlightStyle>("CLASSIC");
   const [length, setLength] = useState<HighlightLength>("MEDIUM");
   const [bgm, setBgm] = useState(false);
+  const [projectBgm, setProjectBgm] = useState<ProjectBgm | null>(null);
   const [subtitles, setSubtitles] = useState(false);
+  const [aiRecommend, setAiRecommend] = useState(false);
 
   async function load() {
-    const res = await apiFetch<AiDashboard>(`/api/projects/${params.id}/ai`);
-    setData(res.data);
-    return res.data;
+    const [aiRes, bgmRes] = await Promise.all([
+      apiFetch<AiDashboard>(`/api/projects/${params.id}/ai`),
+      apiFetch<ProjectBgm>(`/api/projects/${params.id}/bgm`).catch(() => null),
+    ]);
+    setData(aiRes.data);
+    if (bgmRes?.data) {
+      setProjectBgm(bgmRes.data);
+    }
+    return aiRes.data;
   }
 
   useEffect(() => {
@@ -224,7 +233,7 @@ export default function ProjectAiPage() {
     setMessage(null);
     setJustCompletedVideoId(null);
     try {
-      const body: CreateHighlightRequest = { style, length, bgm, subtitles };
+      const body: CreateHighlightRequest = { style, length, bgm, subtitles, aiRecommend };
       const res = await apiFetch<AiVideoJob>(`/api/projects/${params.id}/ai/video`, {
         method: "POST",
         body: JSON.stringify(body),
@@ -294,8 +303,18 @@ export default function ProjectAiPage() {
       </div>
 
       {!!data?.bestShots?.length && !makingVideo && (
-        <section className="mb-8 rounded-2xl border border-accent/20 bg-white/70 p-4">
-          <p className="mb-3 text-sm font-medium">영상 옵션</p>
+        <section className="mb-8 space-y-4 rounded-2xl border border-accent/20 bg-white/70 p-4">
+          <p className="text-sm font-medium">영상 옵션</p>
+          <ProjectBgmUploader
+            projectId={params.id}
+            value={projectBgm}
+            onChange={(next) => {
+              setProjectBgm(next);
+              if (next.uploaded) setBgm(true);
+            }}
+            disabled={running}
+            hint="배경음악을 켜면 업로드한 음원을 우선 사용합니다. 없으면 서버 기본 음원(있을 때)을 씁니다."
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-2 text-xs text-muted">스타일</p>
@@ -343,22 +362,43 @@ export default function ProjectAiPage() {
             <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
-                checked={subtitles}
+                checked={aiRecommend}
                 disabled={running}
+                onChange={(e) => setAiRecommend(e.target.checked)}
+              />
+              AI 추천 (분위기·자막)
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={subtitles}
+                disabled={running || aiRecommend}
                 onChange={(e) => setSubtitles(e.target.checked)}
               />
-              장면 이름 자막
+              장면 자막
             </label>
             <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={bgm}
-                disabled={running}
+                disabled={running || aiRecommend}
                 onChange={(e) => setBgm(e.target.checked)}
               />
               배경음악
             </label>
           </div>
+          {aiRecommend && (
+            <p className="mt-2 text-xs text-muted">
+              AI가 분위기에 맞는 스타일과 짧은 자막을 고릅니다. BGM은 업로드 음원 또는 서버
+              기본 음원이 있을 때 켜집니다.
+            </p>
+          )}
+          {!aiRecommend && bgm && !projectBgm?.uploaded && (
+            <p className="mt-2 text-xs text-muted">
+              사용자 BGM이 없으면 서버 기본 음원만 사용합니다. 위에서 음원을 업로드할 수
+              있습니다.
+            </p>
+          )}
         </section>
       )}
 

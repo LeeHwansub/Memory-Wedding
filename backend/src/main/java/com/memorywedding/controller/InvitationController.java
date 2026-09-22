@@ -8,6 +8,7 @@ import com.memorywedding.invitation.dto.InvitationResponse;
 import com.memorywedding.invitation.dto.PublicInvitationResponse;
 import com.memorywedding.invitation.dto.ReorderGalleryRequest;
 import com.memorywedding.invitation.dto.UpdateInvitationRequest;
+import com.memorywedding.project.ProjectBgmService;
 import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class InvitationController {
 
     private final InvitationService invitationService;
+    private final ProjectBgmService projectBgmService;
 
     @GetMapping("/api/projects/{projectId}/invitation")
     public ApiResponse<InvitationResponse> get(
@@ -96,6 +98,11 @@ public class InvitationController {
             @PathVariable Long mediaId) {
         Long memberId = (Long) authentication.getPrincipal();
         return invitationService.openMediaForOwner(memberId, projectId, mediaId);
+    }
+
+    @GetMapping("/api/public/w/{slug}/bgm/content")
+    public ResponseEntity<InputStreamResource> openPublicBgm(@PathVariable String slug) {
+        return projectBgmService.openPublic(slug);
     }
 
     @GetMapping("/api/public/w/{slug}")

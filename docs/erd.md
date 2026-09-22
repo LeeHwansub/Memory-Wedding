@@ -224,6 +224,11 @@ erDiagram
 | venue_address | VARCHAR(500) | YES | | 예식장 주소 |
 | status | ENUM('DRAFT','ACTIVE','ARCHIVED') | NO | | Project 상태 |
 | drive_root_folder_id | VARCHAR(100) | YES | | Drive 루트 폴더 ID |
+| bgm_storage_provider | VARCHAR(50) | YES | | BGM 스토리지 제공자 |
+| bgm_storage_key | VARCHAR(500) | YES | | BGM ObjectStorage 키 |
+| bgm_original_filename | VARCHAR(255) | YES | | BGM 원본 파일명 |
+| bgm_mime_type | VARCHAR(100) | YES | | BGM MIME |
+| bgm_file_size | BIGINT | YES | | BGM 바이트 크기 |
 | created_at | DATETIME | NO | | 생성일 |
 | updated_at | DATETIME | NO | | 수정일 |
 | deleted_at | DATETIME | YES | | Soft Delete |

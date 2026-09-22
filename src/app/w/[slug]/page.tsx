@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GuestbookCarousel } from "@/components/guestbook/GuestbookCarousel";
 import { GalleryCard } from "@/components/invitation/GalleryCard";
+import { InvitationBgmPlayer } from "@/components/invitation/InvitationBgmPlayer";
 import { MainPhotoHero } from "@/components/invitation/MainPhotoHero";
 import { KakaoMap } from "@/components/ui/KakaoMap";
 import { PreviewChrome } from "@/components/ui/PreviewChrome";
@@ -110,6 +111,9 @@ export default function PublicInvitationPage() {
 
   return (
     <main className="min-h-screen" style={themeStyle}>
+      {data.bgm?.uploaded && data.bgm.contentPath && (
+        <InvitationBgmPlayer contentPath={data.bgm.contentPath} />
+      )}
       {showPreviewChrome && (
         <PreviewChrome
           projectHref={

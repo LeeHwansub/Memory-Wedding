@@ -57,6 +57,20 @@ public class WeddingProject extends BaseTimeEntity {
     @Column(length = 100)
     private String driveRootFolderId;
 
+    @Column(length = 50)
+    private String bgmStorageProvider;
+
+    @Column(length = 500)
+    private String bgmStorageKey;
+
+    @Column(length = 255)
+    private String bgmOriginalFilename;
+
+    @Column(length = 100)
+    private String bgmMimeType;
+
+    private Long bgmFileSize;
+
     private LocalDateTime deletedAt;
 
     @Builder
@@ -107,5 +121,30 @@ public class WeddingProject extends BaseTimeEntity {
 
     public void assignDriveRootFolderId(String driveRootFolderId) {
         this.driveRootFolderId = driveRootFolderId;
+    }
+
+    public boolean hasBgm() {
+        return bgmStorageKey != null && !bgmStorageKey.isBlank();
+    }
+
+    public void applyBgm(
+            String storageProvider,
+            String storageKey,
+            String originalFilename,
+            String mimeType,
+            long fileSize) {
+        this.bgmStorageProvider = storageProvider;
+        this.bgmStorageKey = storageKey;
+        this.bgmOriginalFilename = originalFilename;
+        this.bgmMimeType = mimeType;
+        this.bgmFileSize = fileSize;
+    }
+
+    public void clearBgm() {
+        this.bgmStorageProvider = null;
+        this.bgmStorageKey = null;
+        this.bgmOriginalFilename = null;
+        this.bgmMimeType = null;
+        this.bgmFileSize = null;
     }
 }

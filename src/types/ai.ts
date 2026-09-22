@@ -58,6 +58,7 @@ export type CreateHighlightRequest = {
   length?: HighlightLength;
   bgm?: boolean;
   subtitles?: boolean;
+  aiRecommend?: boolean;
 };
 
 export type AiVideoJob = {
@@ -74,6 +75,7 @@ export type AiVideoJob = {
   length?: HighlightLength | string | null;
   bgm?: boolean | null;
   subtitles?: boolean | null;
+  aiRecommend?: boolean | null;
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt?: string | null;

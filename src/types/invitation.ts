@@ -57,6 +57,13 @@ export type Invitation = {
   weddingAt: string;
   slug: string;
   guestPath: string;
+  bgm?: {
+    uploaded: boolean;
+    originalFilename?: string | null;
+    mimeType?: string | null;
+    fileSize?: number | null;
+    contentPath?: string | null;
+  } | null;
 } & InvitationMediaSettings;
 
 export type PublicInvitation = {
@@ -70,4 +77,11 @@ export type PublicInvitation = {
   venueName?: string | null;
   venueAddress?: string | null;
   slug: string;
+  bgm?: {
+    uploaded: boolean;
+    originalFilename?: string | null;
+    mimeType?: string | null;
+    fileSize?: number | null;
+    contentPath?: string | null;
+  } | null;
 } & InvitationMediaSettings;

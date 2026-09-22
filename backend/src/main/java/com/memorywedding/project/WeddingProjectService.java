@@ -13,6 +13,7 @@ import com.memorywedding.domain.repository.InviteLinkRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
 import com.memorywedding.project.dto.CreateProjectRequest;
+import com.memorywedding.project.dto.ProjectBgmResponse;
 import com.memorywedding.project.dto.ProjectResponse;
 import com.memorywedding.project.dto.UpdateProjectRequest;
 import java.text.Normalizer;
@@ -96,6 +97,14 @@ public class WeddingProjectService {
                 trimToNull(request.venueAddress()),
                 request.status()
         );
+        if (request.greetingMessage() != null) {
+            invitationRepository.findByProject_Id(projectId).ifPresent(invitation ->
+                    invitation.updateContent(
+                            invitation.getTitle(),
+                            request.greetingMessage(),
+                            invitation.getMapUrl(),
+                            invitation.getAccountInfo()));
+        }
         return toResponse(project);
     }
 
@@ -130,7 +139,18 @@ public class WeddingProjectService {
 
     private ProjectResponse toResponse(WeddingProject project) {
         InviteLink inviteLink = inviteLinkRepository.findByProject_Id(project.getId()).orElse(null);
-        return ProjectResponse.from(project, inviteLink);
+        String greeting = invitationRepository.findByProject_Id(project.getId())
+                .map(Invitation::getGreetingMessage)
+                .orElse(null);
+        ProjectBgmResponse bgm = project.hasBgm()
+                ? new ProjectBgmResponse(
+                        true,
+                        project.getBgmOriginalFilename(),
+                        project.getBgmMimeType(),
+                        project.getBgmFileSize(),
+                        "/api/projects/" + project.getId() + "/bgm/content")
+                : ProjectBgmResponse.empty();
+        return ProjectResponse.from(project, inviteLink, greeting, bgm);
     }
 
     private String generateUniqueSlug(String groomName, String brideName) {

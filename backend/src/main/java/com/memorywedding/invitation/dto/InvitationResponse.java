@@ -6,6 +6,7 @@ import com.memorywedding.domain.enums.GalleryLayout;
 import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
+import com.memorywedding.project.dto.ProjectBgmResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -35,14 +36,16 @@ public record InvitationResponse(
         int mainFocalX,
         int mainFocalY,
         InvitationMediaResponse mainPhoto,
-        List<InvitationMediaResponse> gallery
+        List<InvitationMediaResponse> gallery,
+        ProjectBgmResponse bgm
 ) {
     public static InvitationResponse from(
             Invitation invitation,
             List<AccountEntry> accounts,
             String mapUrl,
             InvitationMediaResponse mainPhoto,
-            List<InvitationMediaResponse> gallery) {
+            List<InvitationMediaResponse> gallery,
+            ProjectBgmResponse bgm) {
         WeddingProject project = invitation.getProject();
         return new InvitationResponse(
                 invitation.getId(),
@@ -80,7 +83,8 @@ public record InvitationResponse(
                 invitation.getMainFocalX(),
                 invitation.getMainFocalY(),
                 mainPhoto,
-                gallery
+                gallery,
+                bgm == null ? ProjectBgmResponse.empty() : bgm
         );
     }
 }

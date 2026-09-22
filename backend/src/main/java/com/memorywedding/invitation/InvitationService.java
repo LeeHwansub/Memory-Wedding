@@ -25,6 +25,7 @@ import com.memorywedding.invitation.dto.InvitationResponse;
 import com.memorywedding.invitation.dto.PublicInvitationResponse;
 import com.memorywedding.invitation.dto.ReorderGalleryRequest;
 import com.memorywedding.invitation.dto.UpdateInvitationRequest;
+import com.memorywedding.project.dto.ProjectBgmResponse;
 import com.memorywedding.storage.ObjectStorage;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -244,7 +245,8 @@ public class InvitationService {
                 invitation.getMainFocalX(),
                 invitation.getMainFocalY(),
                 findMain(invitation.getId(), null, true, project.getSlug()),
-                findGallery(invitation.getId(), null, true, project.getSlug())
+                findGallery(invitation.getId(), null, true, project.getSlug()),
+                toBgmResponse(project, null, true)
         );
     }
 
@@ -287,8 +289,25 @@ public class InvitationService {
                 readAccounts(invitation.getAccountInfo()),
                 buildMapUrl(invitation.getProject().getVenueAddress()),
                 findMain(invitation.getId(), projectId, false, null),
-                findGallery(invitation.getId(), projectId, false, null)
+                findGallery(invitation.getId(), projectId, false, null),
+                toBgmResponse(invitation.getProject(), projectId, false)
         );
+    }
+
+    private ProjectBgmResponse toBgmResponse(
+            WeddingProject project, Long projectId, boolean publicPath) {
+        if (project == null || !project.hasBgm()) {
+            return ProjectBgmResponse.empty();
+        }
+        String path = publicPath
+                ? "/api/public/w/" + project.getSlug() + "/bgm/content"
+                : "/api/projects/" + projectId + "/bgm/content";
+        return new ProjectBgmResponse(
+                true,
+                project.getBgmOriginalFilename(),
+                project.getBgmMimeType(),
+                project.getBgmFileSize(),
+                path);
     }
 
     private InvitationMediaResponse findMain(

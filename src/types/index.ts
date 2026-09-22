@@ -18,6 +18,14 @@ export type WeddingProject = {
   inviteToken?: string | null;
   inviteActive?: boolean;
   guestPath?: string;
+  greetingMessage?: string | null;
+  bgm?: {
+    uploaded: boolean;
+    originalFilename?: string | null;
+    mimeType?: string | null;
+    fileSize?: number | null;
+    contentPath?: string | null;
+  } | null;
   createdAt?: string;
 };
 
@@ -31,4 +39,5 @@ export type CreateProjectInput = {
 
 export type UpdateProjectInput = CreateProjectInput & {
   status?: ProjectStatus;
+  greetingMessage?: string;
 };

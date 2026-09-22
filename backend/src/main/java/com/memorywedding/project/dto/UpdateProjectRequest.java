@@ -12,6 +12,8 @@ public record UpdateProjectRequest(
         @NotNull LocalDateTime weddingAt,
         @Size(max = 200) String venueName,
         @Size(max = 500) String venueAddress,
-        ProjectStatus status
+        ProjectStatus status,
+        /** 청첩장 소개글(인사말). null이면 기존 값 유지 */
+        String greetingMessage
 ) {
 }

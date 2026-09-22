@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AddressSearchField } from "@/components/ui/AddressSearchField";
 import { StatusModal } from "@/components/ui/StatusModal";
+import { ProjectBgmUploader, type ProjectBgm } from "@/components/project/ProjectBgmUploader";
 import { apiFetch } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { toApiLocalDateTime, toDatetimeLocalValue } from "@/lib/datetime";
@@ -37,11 +38,14 @@ export default function EditProjectPage() {
   const [weddingAt, setWeddingAt] = useState("");
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
+  const [greetingMessage, setGreetingMessage] = useState("");
+  const [bgm, setBgm] = useState<ProjectBgm | null>(null);
   const [status, setStatus] = useState<ProjectStatus>("DRAFT");
   const [drive, setDrive] = useState<ProjectDriveStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [recommending, setRecommending] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
   const [modal, setModal] = useState<DriveModal>(null);
 
@@ -81,6 +85,8 @@ export default function EditProjectPage() {
         setWeddingAt(toDatetimeLocalValue(project.weddingAt));
         setVenueName(project.venueName ?? "");
         setVenueAddress(project.venueAddress ?? "");
+        setGreetingMessage(project.greetingMessage ?? "");
+        setBgm(project.bgm ?? { uploaded: false });
         setStatus(project.status);
         setDrive(driveRes.data);
       })
@@ -103,6 +109,7 @@ export default function EditProjectPage() {
           venueName: venueName || undefined,
           venueAddress: venueAddress || undefined,
           status,
+          greetingMessage,
         }),
       });
       router.replace(`/dashboard/projects/${params.id}`);
@@ -110,6 +117,32 @@ export default function EditProjectPage() {
       setError(err instanceof Error ? err.message : "수정 실패");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRecommendGreeting() {
+    setRecommending(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{ greetingMessage: string }>(
+        `/api/projects/${params.id}/ai/greeting`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            groomName,
+            brideName,
+            venueName: venueName || undefined,
+            weddingAt: weddingAt ? toApiLocalDateTime(weddingAt) : undefined,
+          }),
+        },
+      );
+      if (res.data?.greetingMessage) {
+        setGreetingMessage(res.data.greetingMessage);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "소개글 추천 실패");
+    } finally {
+      setRecommending(false);
     }
   }
 
@@ -218,6 +251,29 @@ export default function EditProjectPage() {
             }
           }}
         />
+        <div className="block text-sm">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-muted">소개글</span>
+            <button
+              type="button"
+              disabled={recommending || submitting}
+              onClick={handleRecommendGreeting}
+              className="rounded-full border border-accent/30 px-3 py-1 text-xs disabled:opacity-50"
+            >
+              {recommending ? "추천 중..." : "AI 추천"}
+            </button>
+          </div>
+          <textarea
+            value={greetingMessage}
+            onChange={(e) => setGreetingMessage(e.target.value)}
+            rows={5}
+            placeholder="하객에게 전하는 인사말을 작성하거나 AI 추천을 받아 보세요."
+            className="w-full rounded-xl border border-accent/30 bg-white px-4 py-3"
+          />
+          <p className="mt-1 text-xs text-muted">
+            청첩장 인사말과 동일합니다. 저장 시 함께 반영됩니다.
+          </p>
+        </div>
         <label className="block text-sm">
           <span className="mb-1 block text-muted">상태</span>
           <select
@@ -258,6 +314,13 @@ export default function EditProjectPage() {
             )}
           </div>
         </section>
+
+        <ProjectBgmUploader
+          projectId={params.id}
+          value={bgm}
+          onChange={setBgm}
+          disabled={submitting || driveBusy}
+        />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

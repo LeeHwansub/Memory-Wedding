@@ -7,7 +7,8 @@ public record HighlightOptions(
         Style style,
         Length length,
         boolean bgm,
-        boolean subtitles
+        boolean subtitles,
+        boolean aiRecommend
 ) {
 
     public enum Style {
@@ -29,19 +30,33 @@ public record HighlightOptions(
     }
 
     public static HighlightOptions defaults() {
-        return new HighlightOptions(Style.CLASSIC, Length.MEDIUM, false, false);
+        return new HighlightOptions(Style.CLASSIC, Length.MEDIUM, false, false, false);
     }
 
     public static HighlightOptions fromRequest(
             String style,
             String length,
             Boolean bgm,
-            Boolean subtitles) {
+            Boolean subtitles,
+            Boolean aiRecommend) {
         return new HighlightOptions(
                 parseStyle(style),
                 parseLength(length),
                 Boolean.TRUE.equals(bgm),
-                Boolean.TRUE.equals(subtitles));
+                Boolean.TRUE.equals(subtitles),
+                Boolean.TRUE.equals(aiRecommend));
+    }
+
+    public HighlightOptions withStyle(Style newStyle) {
+        return new HighlightOptions(newStyle, length, bgm, subtitles, aiRecommend);
+    }
+
+    public HighlightOptions withBgm(boolean enabled) {
+        return new HighlightOptions(style, length, enabled, subtitles, aiRecommend);
+    }
+
+    public HighlightOptions withSubtitles(boolean enabled) {
+        return new HighlightOptions(style, length, bgm, enabled, aiRecommend);
     }
 
     private static Style parseStyle(String raw) {
@@ -99,7 +114,6 @@ public record HighlightOptions(
         return Math.min(base, hold / 2.5);
     }
 
-    /** Ken Burns 줌 강도 (초당 on 증가분 스케일). */
     public double zoomSpeed() {
         return switch (style) {
             case CLASSIC -> 0.0012;

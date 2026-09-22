@@ -1,14 +1,18 @@
 package com.memorywedding.controller;
 
 import com.memorywedding.common.ApiResponse;
+import com.memorywedding.project.ProjectBgmService;
 import com.memorywedding.project.WeddingProjectService;
 import com.memorywedding.project.dto.CreateProjectRequest;
+import com.memorywedding.project.dto.ProjectBgmResponse;
 import com.memorywedding.project.dto.ProjectResponse;
 import com.memorywedding.project.dto.UpdateProjectRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +22,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -26,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WeddingProjectController {
 
     private final WeddingProjectService weddingProjectService;
+    private final ProjectBgmService projectBgmService;
 
     @GetMapping
     public ApiResponse<List<ProjectResponse>> list(Authentication authentication) {
@@ -75,5 +82,41 @@ public class WeddingProjectController {
         Long memberId = (Long) authentication.getPrincipal();
         boolean active = Boolean.TRUE.equals(body.get("active"));
         return ApiResponse.ok(weddingProjectService.toggleInviteLink(memberId, projectId, active));
+    }
+
+    @GetMapping("/{projectId}/bgm")
+    public ApiResponse<ProjectBgmResponse> getBgm(
+            Authentication authentication,
+            @PathVariable Long projectId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ApiResponse.ok(projectBgmService.getForOwner(memberId, projectId));
+    }
+
+    @PostMapping("/{projectId}/bgm")
+    public ApiResponse<ProjectBgmResponse> uploadBgm(
+            Authentication authentication,
+            @PathVariable Long projectId,
+            @RequestParam("file") MultipartFile file) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ApiResponse.ok(
+                projectBgmService.upload(memberId, projectId, file),
+                "BGM이 업로드되었습니다.");
+    }
+
+    @DeleteMapping("/{projectId}/bgm")
+    public ApiResponse<Void> deleteBgm(
+            Authentication authentication,
+            @PathVariable Long projectId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        projectBgmService.delete(memberId, projectId);
+        return ApiResponse.ok(null, "BGM이 삭제되었습니다.");
+    }
+
+    @GetMapping("/{projectId}/bgm/content")
+    public ResponseEntity<InputStreamResource> openBgm(
+            Authentication authentication,
+            @PathVariable Long projectId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return projectBgmService.openForOwner(memberId, projectId);
     }
 }

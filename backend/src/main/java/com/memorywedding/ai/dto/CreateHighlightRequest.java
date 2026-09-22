@@ -1,13 +1,14 @@
 package com.memorywedding.ai.dto;
 
 /**
- * 하이라이트 생성 옵션 (FR-AI-012~015 1차).
- * null/빈 값은 서버 기본값으로 채웁니다.
+ * 하이라이트 생성 옵션 (FR-AI-012~015).
+ * aiRecommend=true 이면 분위기 스타일·BGM·자막을 AI가 보조합니다.
  */
 public record CreateHighlightRequest(
         String style,
         String length,
         Boolean bgm,
-        Boolean subtitles
+        Boolean subtitles,
+        Boolean aiRecommend
 ) {
 }

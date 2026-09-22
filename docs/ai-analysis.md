@@ -26,7 +26,8 @@
 | FR-AI-009 | 생성 완료 안내 | ✅ 1차 | 페이지 내 배너·메시지. 푸시/메일은 후속 |
 | FR-AI-010 | 영상 재생성 | ✅ | 확인 다이얼로그 + 새 Job. 생성 중 중복 차단 |
 | FR-AI-011 | 분석 결과 조회 | ✅ | 대시보드 장면·Best Shot |
-| FR-AI-012~015 | BGM·자막·스타일·길이 | ✅ 1차 | 프리셋·장면자막·선택 BGM |
+| FR-AI-012~015 | BGM·자막·스타일·길이 | ✅ 고도화 1차 | 프리셋 + AI 분위기·LLM 자막 |
+| (확장) | 청첩장 소개글 AI 추천 | ✅ 1차 | `POST .../ai/greeting` · 기본정보·청첩장 UI |
 | FR-AI-016 | 중복 사진 제거 | ✅ 1차 | aHash 유사도, 분류·Best Shot·하이라이트에서 제외 |
 | FR-AI-017~018 | 감정·인물 그룹화 | ❌ | 후속 |
 | NFR-003 | 비동기 AI 처리 | ✅ 1차 | 인메모리 `@Async` 스레드 풀 (외부 Broker 없음) |
@@ -86,6 +87,7 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 | POST | `/api/projects/{id}/ai/analyze` | 사진·영상 분석 (**비동기** — Job 즉시 반환) |
 | GET | `/api/projects/{id}/ai/video` | 최근 하이라이트 Job |
 | POST | `/api/projects/{id}/ai/video` | 하이라이트 MP4 생성 (**비동기**) + Drive best-effort |
+| POST | `/api/projects/{id}/ai/greeting` | 청첩장 소개글(인사말) AI 추천 |
 | GET | `/api/projects/{id}/ai/video/{jobId}/content` | 생성된 MP4 스트리밍 |
 
 > POST는 Job을 `PROCESSING`으로 만들고 즉시 응답한다. 워커(`aiTaskExecutor`)가 처리하며, FE는 `GET /ai`를 폴링한다.
@@ -123,16 +125,33 @@ FFmpeg 미설치·추출 실패 시: 해당 영상만 파일명 휴리스틱 폴
 6. Drive 연동 시 `AI/` · `Archive/`에 `highlight-{slug}-{jobId}.mp4` best-effort 업로드  
    (`drive_file_id` = AI 폴더 파일 ID). 미연동·실패해도 Job은 COMPLETED 유지
 
-### 생성 옵션 (FR-AI-012~015 1차)
+### 생성 옵션 (FR-AI-012~015)
 
 | 옵션 | 값 | 동작 |
 |------|-----|------|
 | style | CLASSIC / SOFT / CINEMATIC | 줌·페이드 강도 |
 | length | SHORT / MEDIUM / LONG | 클립 길이·최대 개수 |
-| subtitles | on/off | 장면명(입장·축가…) 간단 자막 |
-| bgm | on/off | `classpath:bgm/default.mp3` 있으면 믹스, 없으면 무음 |
+| subtitles | on/off | 클립별 짧은 한글 자막 (메타·장면 기반, Gemini 실패 시 템플릿) |
+| bgm | on/off | 사용자 업로드 BGM 우선, 없으면 `classpath:bgm/default.mp3`, 둘 다 없으면 무음 |
+| aiRecommend | on/off | Best Shot 장면으로 스타일 추천 + 자막 on + BGM은 음원 있을 때만 |
 
-POST `/api/projects/{id}/ai/video` body 예: `{ "style":"SOFT","length":"SHORT","bgm":false,"subtitles":true }`
+### 프로젝트 BGM (하이라이트 · 청첩장 공용)
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET/POST/DELETE | `/api/projects/{id}/bgm` | 조회·업로드·삭제 |
+| GET | `/api/projects/{id}/bgm/content` | 소유자 스트리밍 |
+| GET | `/api/public/w/{slug}/bgm/content` | 공개 청첩장 스트리밍 |
+
+- 형식: MP3/M4A/AAC/WAV, 15MB 이하
+- 저장 키: `{slug}/bgm/{uuid}_{filename}`
+- UI: 기본정보 · 청첩장 편집 · AI 하이라이트 옵션
+- 공개 청첩장: 우하단 **음악 켜기/끄기** 버튼
+
+POST `/api/projects/{id}/ai/video` body 예:  
+`{ "style":"SOFT","length":"SHORT","bgm":false,"subtitles":true,"aiRecommend":true }`
+
+구현: `HighlightNarrationService` (자막·mood → Style). Mock Gemini에서도 동일 API.
 
 ### 진행 · 완료 · 재생성 (FR-AI-008~010)
 
@@ -166,6 +185,6 @@ Gemini env는 `docker-compose.yml` / `.env`로 전달. AI·ffmpeg 변경 후: `d
 ## 11. 후속 (우선순위 제안)
 
 1. Redis 등 외부 Queue · 재시도/데드레터 (NFR-003 고도화)
-2. AI BGM 추천 · LLM 자막 문장 (012·013 고도화)
-3. FR-AI-017~018 · VIDEO 중간 구간 자동 선정
-4. 기본 BGM 음원 라이선스 확보 후 `resources/bgm/default.mp3` 배포
+2. FR-AI-017~018 · VIDEO 중간 구간 자동 선정
+3. 기본 BGM 음원 라이선스 확보 후 `resources/bgm/default.mp3` 배포 (폴백용)
+4. 분위기별 복수 BGM 트랙 매핑 (012 추가 고도화)

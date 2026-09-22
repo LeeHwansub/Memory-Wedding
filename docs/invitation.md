@@ -30,7 +30,18 @@ Wedding Project에 연결된 **모바일 청첩장**을 편집·공개하고, �
 | GET | `/api/projects/{id}/invitation` | JWT | 소유자 조회 |
 | PUT | `/api/projects/{id}/invitation` | JWT | 내용 수정 |
 | PATCH | `/api/projects/{id}/invitation/publish` | JWT | `{ published }` |
+| POST | `/api/projects/{id}/ai/greeting` | JWT | 소개글(인사말) AI 추천 |
 | GET | `/api/public/w/{slug}` | Public | 하객 조회 |
+
+### 소개글 AI 추천
+- 기본정보·청첩장 편집의 **AI 추천** 버튼 → `POST .../ai/greeting`
+- body(선택): `{ groomName, brideName, venueName, weddingAt }` — 미입력 시 저장값 사용
+- Gemini 없으면 템플릿 폴백
+- 기본정보 저장 시 `PUT /api/projects/{id}` 의 `greetingMessage`로 청첩장 인사말 동기화
+
+### 프로젝트 BGM
+- `POST/DELETE /api/projects/{id}/bgm` — 하이라이트·청첩장 공용 음원
+- 공개: `/api/public/w/{slug}/bgm/content` + 하객 페이지 **음악 켜기** 버튼
 
 공개 조건:
 1. Project 존재·미삭제

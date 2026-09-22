@@ -60,6 +60,11 @@ public class HighlightVideoComposer {
     }
 
     public byte[] composeSegments(List<Segment> segments, HighlightOptions options) throws IOException {
+        return composeSegments(segments, options, null);
+    }
+
+    public byte[] composeSegments(List<Segment> segments, HighlightOptions options, Path customBgm)
+            throws IOException {
         if (segments == null || segments.isEmpty()) {
             throw new IllegalArgumentException("하이라이트 클립이 없습니다.");
         }
@@ -105,11 +110,11 @@ public class HighlightVideoComposer {
 
             Path output = workDir.resolve("highlight.mp4");
             if (opts.bgm()) {
-                Path bgm = extractBundledBgm(workDir);
+                Path bgm = resolveBgm(workDir, customBgm);
                 if (bgm != null) {
                     muxBgm(silent, bgm, output, totalDuration);
                 } else {
-                    log.info("BGM 요청됐지만 classpath:bgm/default.mp3 가 없어 무음으로 저장합니다.");
+                    log.info("BGM 요청됐지만 사용자 BGM·기본 음원이 없어 무음으로 저장합니다.");
                     Files.copy(silent, output);
                 }
             } else {
@@ -279,6 +284,19 @@ public class HighlightVideoComposer {
                 output.toAbsolutePath().toString()
         );
         runFfmpeg(command, output.getParent(), 120, "bgm mux");
+    }
+
+    private Path resolveBgm(Path workDir, Path customBgm) {
+        if (customBgm != null && Files.isRegularFile(customBgm)) {
+            try {
+                if (Files.size(customBgm) > 0) {
+                    return customBgm;
+                }
+            } catch (IOException ignored) {
+                // fall through to bundled
+            }
+        }
+        return extractBundledBgm(workDir);
     }
 
     private Path extractBundledBgm(Path workDir) {

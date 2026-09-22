@@ -4,6 +4,7 @@ import com.memorywedding.domain.enums.GalleryLayout;
 import com.memorywedding.domain.enums.InvitationTemplate;
 import com.memorywedding.domain.enums.MainPhotoPlacement;
 import com.memorywedding.domain.enums.MediaDisplaySize;
+import com.memorywedding.project.dto.ProjectBgmResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public record PublicInvitationResponse(
         int mainFocalX,
         int mainFocalY,
         InvitationMediaResponse mainPhoto,
-        List<InvitationMediaResponse> gallery
+        List<InvitationMediaResponse> gallery,
+        ProjectBgmResponse bgm
 ) {
 }

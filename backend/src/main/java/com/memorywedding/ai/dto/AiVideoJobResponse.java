@@ -17,6 +17,7 @@ public record AiVideoJobResponse(
         String length,
         Boolean bgm,
         Boolean subtitles,
+        Boolean aiRecommend,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
         LocalDateTime createdAt

@@ -17,9 +17,15 @@ public record ProjectResponse(
         String inviteToken,
         boolean inviteActive,
         String guestPath,
+        String greetingMessage,
+        ProjectBgmResponse bgm,
         LocalDateTime createdAt
 ) {
-    public static ProjectResponse from(WeddingProject project, InviteLink inviteLink) {
+    public static ProjectResponse from(
+            WeddingProject project,
+            InviteLink inviteLink,
+            String greetingMessage,
+            ProjectBgmResponse bgm) {
         return new ProjectResponse(
                 project.getId(),
                 project.getSlug(),
@@ -32,6 +38,8 @@ public record ProjectResponse(
                 inviteLink != null ? inviteLink.getToken() : null,
                 inviteLink != null && inviteLink.isActive(),
                 "/w/" + project.getSlug(),
+                greetingMessage,
+                bgm == null ? ProjectBgmResponse.empty() : bgm,
                 project.getCreatedAt()
         );
     }

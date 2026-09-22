@@ -19,6 +19,7 @@ import com.memorywedding.domain.repository.AiVideoJobRepository;
 import com.memorywedding.domain.repository.MemberRepository;
 import com.memorywedding.domain.repository.WeddingProjectRepository;
 import com.memorywedding.drive.DriveSyncService;
+import com.memorywedding.project.ProjectBgmService;
 import com.memorywedding.storage.ObjectStorage;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -53,6 +54,8 @@ public class AiHighlightService {
     private final AiAsyncDispatcher aiAsyncDispatcher;
     private final AiJobProgressService aiJobProgressService;
     private final AiHighlightWriteService aiHighlightWriteService;
+    private final HighlightNarrationService highlightNarrationService;
+    private final ProjectBgmService projectBgmService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -78,6 +81,7 @@ public class AiHighlightService {
             throw new BadRequestException(
                     "하이라이트에 쓸 대표 컷 사진·영상이 없습니다. AI 분석 후 다시 시도해 주세요.");
         }
+        options = applyAiRecommend(options, assets, projectId);
 
         AiVideoJob job = aiVideoJobRepository.save(
                 AiVideoJob.builder().project(project).requestedBy(member).build());
@@ -126,7 +130,7 @@ public class AiHighlightService {
                     continue;
                 }
                 String sceneLabel = options.subtitles()
-                        ? sceneLabelKo(result.getSceneCategory())
+                        ? buildCaption(result)
                         : null;
                 segments.add(new HighlightVideoComposer.Segment(
                         video
@@ -142,7 +146,10 @@ public class AiHighlightService {
                 return;
             }
 
-            byte[] mp4 = highlightVideoComposer.composeSegments(segments, options);
+            Path customBgm = options.bgm()
+                    ? projectBgmService.copyToWorkDir(projectId, workDir)
+                    : null;
+            byte[] mp4 = highlightVideoComposer.composeSegments(segments, options, customBgm);
             String objectKey = "ai-highlight/" + projectId + "/" + UUID.randomUUID() + ".mp4";
             ObjectStorage.StoredObject stored = objectStorage.store(
                     objectKey,
@@ -220,6 +227,7 @@ public class AiHighlightService {
                 options.length().name(),
                 options.bgm(),
                 options.subtitles(),
+                options.aiRecommend(),
                 fresh.getStartedAt(),
                 fresh.getCompletedAt(),
                 fresh.getCreatedAt()
@@ -231,7 +239,59 @@ public class AiHighlightService {
             return HighlightOptions.defaults();
         }
         return HighlightOptions.fromRequest(
-                request.style(), request.length(), request.bgm(), request.subtitles());
+                request.style(),
+                request.length(),
+                request.bgm(),
+                request.subtitles(),
+                request.aiRecommend());
+    }
+
+    private HighlightOptions applyAiRecommend(
+            HighlightOptions options, List<AiPhotoResult> assets, Long projectId) {
+        if (!options.aiRecommend()) {
+            return options;
+        }
+        List<SceneCategory> scenes = assets.stream()
+                .map(AiPhotoResult::getSceneCategory)
+                .toList();
+        HighlightOptions.Style style = highlightNarrationService.recommendStyle(scenes);
+        boolean bgm = options.bgm()
+                || highlightNarrationService.isBundledBgmAvailable()
+                || projectBgmService.hasBgm(projectId);
+        return options.withStyle(style).withBgm(bgm).withSubtitles(true);
+    }
+
+    private String buildCaption(AiPhotoResult result) {
+        try {
+            List<String> people = List.of();
+            List<String> objects = List.of();
+            String place = "";
+            String metadataJson = result.getMetadataJson();
+            if (metadataJson != null && !metadataJson.isBlank()) {
+                JsonNode node = objectMapper.readTree(metadataJson);
+                people = readStringList(node.path("people"));
+                objects = readStringList(node.path("objects"));
+                place = node.path("place").asText("");
+            }
+            return highlightNarrationService.generateCaption(
+                    result.getSceneCategory(), people, objects, place);
+        } catch (Exception e) {
+            log.warn("Caption build failed: {}", e.getMessage());
+            return sceneLabelKo(result.getSceneCategory());
+        }
+    }
+
+    private List<String> readStringList(JsonNode node) {
+        List<String> values = new ArrayList<>();
+        if (node == null || !node.isArray()) {
+            return values;
+        }
+        node.forEach(item -> {
+            if (item.isTextual() && !item.asText().isBlank()) {
+                values.add(item.asText().trim());
+            }
+        });
+        return values;
     }
 
     private String toOptionsJson(HighlightOptions options) {
@@ -241,9 +301,10 @@ public class AiHighlightService {
             map.put("length", options.length().name());
             map.put("bgm", options.bgm());
             map.put("subtitles", options.subtitles());
+            map.put("aiRecommend", options.aiRecommend());
             return objectMapper.writeValueAsString(map);
         } catch (Exception e) {
-            return "{\"style\":\"CLASSIC\",\"length\":\"MEDIUM\",\"bgm\":false,\"subtitles\":false}";
+            return "{\"style\":\"CLASSIC\",\"length\":\"MEDIUM\",\"bgm\":false,\"subtitles\":false,\"aiRecommend\":false}";
         }
     }
 
@@ -257,7 +318,8 @@ public class AiHighlightService {
                     textOrNull(node, "style"),
                     textOrNull(node, "length"),
                     node.has("bgm") && node.get("bgm").asBoolean(false),
-                    node.has("subtitles") && node.get("subtitles").asBoolean(false));
+                    node.has("subtitles") && node.get("subtitles").asBoolean(false),
+                    node.has("aiRecommend") && node.get("aiRecommend").asBoolean(false));
         } catch (Exception e) {
             return HighlightOptions.defaults();
         }
