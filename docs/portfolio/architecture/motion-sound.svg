@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="780" viewBox="0 0 1440 780" fill="none">
+  <rect width="1440" height="780" fill="#FAFBFC"/>
+  <text x="64" y="72" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="2">SYSTEM ARCHITECTURE</text>
+  <text x="64" y="112" fill="#0F172A" font-family="Helvetica, Arial, sans-serif" font-size="36" font-weight="700">Motion Sound</text>
+  <text x="64" y="146" fill="#64748B" font-family="Helvetica, Arial, sans-serif" font-size="16">Motion capture to sound / real-time interactive music</text>
+
+  <line x1="360" y1="420" x2="400" y2="420" stroke="#CBD5E1" stroke-width="2"/>
+  <polygon points="400,414 412,420 400,426" fill="#94A3B8"/>
+  <line x1="700" y1="420" x2="740" y2="420" stroke="#CBD5E1" stroke-width="2"/>
+  <polygon points="740,414 752,420 740,426" fill="#94A3B8"/>
+  <line x1="1040" y1="420" x2="1080" y2="420" stroke="#CBD5E1" stroke-width="2"/>
+  <polygon points="1080,414 1092,420 1080,426" fill="#94A3B8"/>
+
+  <rect x="64" y="200" width="280" height="460" rx="20" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="64" y="200" width="280" height="56" rx="20" fill="#0F172A"/>
+  <rect x="64" y="228" width="280" height="28" fill="#0F172A"/>
+  <text x="204" y="236" text-anchor="middle" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Client</text>
+
+  <text x="88" y="300" fill="#0F172A" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700">Next.js 14</text>
+  <text x="88" y="326" fill="#64748B" font-family="Helvetica, Arial, sans-serif" font-size="13">Webcam / SSR / CSR</text>
+  <rect x="88" y="356" width="100" height="32" rx="16" fill="#F1F5F9"/>
+  <text x="138.0" y="377" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">MediaPipe</text>
+  <rect x="196" y="356" width="100" height="32" rx="16" fill="#F1F5F9"/>
+  <text x="246.0" y="377" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">Web Audio</text>
+  <rect x="88" y="400" width="76" height="32" rx="16" fill="#F1F5F9"/>
+  <text x="126.0" y="421" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">WebRTC</text>
+  <rect x="172" y="400" width="132" height="32" rx="16" fill="#F1F5F9"/>
+  <text x="238.0" y="421" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">TensorFlow.js</text>
+  <text x="88" y="480" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="1">LAYERS</text>
+  <text x="88" y="510" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Perception (pose/hands)</text>
+  <text x="88" y="536" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Mapping (pitch/volume)</text>
+  <text x="88" y="562" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Expression (ADSR)</text>
+
+  <rect x="412" y="200" width="280" height="460" rx="20" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="412" y="200" width="280" height="56" rx="20" fill="#1E3A5F"/>
+  <rect x="412" y="228" width="280" height="28" fill="#1E3A5F"/>
+  <text x="552" y="236" text-anchor="middle" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Backend</text>
+
+  <text x="436" y="300" fill="#0F172A" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700">Nest.js 10</text>
+  <text x="436" y="326" fill="#64748B" font-family="Helvetica, Arial, sans-serif" font-size="13">Realtime session / REST</text>
+  <rect x="436" y="356" width="100" height="32" rx="16" fill="#EFF6FF"/>
+  <text x="486.0" y="377" text-anchor="middle" fill="#1E40AF" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">Socket.IO</text>
+  <rect x="544" y="356" width="70" height="32" rx="16" fill="#EFF6FF"/>
+  <text x="579.0" y="377" text-anchor="middle" fill="#1E40AF" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">JWT</text>
+  <rect x="436" y="400" width="70" height="32" rx="16" fill="#EFF6FF"/>
+  <text x="471.0" y="421" text-anchor="middle" fill="#1E40AF" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">Jest</text>
+  <text x="436" y="480" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="1">DOMAINS</text>
+  <text x="436" y="510" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Auth / Session</text>
+  <text x="436" y="536" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Motion stream</text>
+  <text x="436" y="562" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Sound mapping</text>
+
+  <rect x="760" y="200" width="280" height="460" rx="20" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="760" y="200" width="280" height="56" rx="20" fill="#334155"/>
+  <rect x="760" y="228" width="280" height="28" fill="#334155"/>
+  <text x="900" y="236" text-anchor="middle" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600">Data</text>
+
+  <text x="784" y="300" fill="#0F172A" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700">MySQL + MongoDB</text>
+  <text x="784" y="326" fill="#64748B" font-family="Helvetica, Arial, sans-serif" font-size="13">Structured + motion data</text>
+  <rect x="784" y="356" width="84" height="32" rx="16" fill="#F8FAFC"/>
+  <text x="826.0" y="377" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">MySQL 8</text>
+  <rect x="876" y="356" width="100" height="32" rx="16" fill="#F8FAFC"/>
+  <text x="926.0" y="377" text-anchor="middle" fill="#334155" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">MongoDB 7</text>
+  <text x="784" y="480" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="1">STORES</text>
+  <text x="784" y="510" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Member / settings</text>
+  <text x="784" y="536" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Motion landmarks</text>
+  <text x="784" y="562" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Sound metadata</text>
+
+  <rect x="1108" y="200" width="268" height="460" rx="20" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="1108" y="200" width="268" height="56" rx="20" fill="#0F766E"/>
+  <rect x="1108" y="228" width="268" height="28" fill="#0F766E"/>
+  <text x="1242" y="236" text-anchor="middle" fill="#FFFFFF" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600">External</text>
+
+  <text x="1132" y="300" fill="#0F172A" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700">Infra</text>
+  <text x="1132" y="326" fill="#64748B" font-family="Helvetica, Arial, sans-serif" font-size="13">Deploy / edge runtime</text>
+  <rect x="1132" y="356" width="76" height="32" rx="16" fill="#F0FDFA"/>
+  <text x="1170.0" y="377" text-anchor="middle" fill="#115E59" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">Docker</text>
+  <rect x="1216" y="356" width="70" height="32" rx="16" fill="#F0FDFA"/>
+  <text x="1251.0" y="377" text-anchor="middle" fill="#115E59" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500">Nginx</text>
+  <text x="1132" y="480" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="1">RUNTIME</text>
+  <text x="1132" y="510" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Browser WASM</text>
+  <text x="1132" y="536" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">HTTPS reverse proxy</text>
+  <text x="1132" y="562" fill="#475569" font-family="Helvetica, Arial, sans-serif" font-size="14">Containerized API</text>
+
+  <text x="64" y="720" fill="#94A3B8" font-family="Helvetica, Arial, sans-serif" font-size="12">Client -&gt; API -&gt; Data / External</text>
+</svg>
