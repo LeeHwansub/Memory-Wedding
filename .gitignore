@@ -17,6 +17,8 @@
 
 # production
 /build
+/backend/build/
+/backend/.gradle/
 
 # misc
 .DS_Store
@@ -32,6 +34,16 @@ yarn-error.log*
 .env*.local
 .env
 
+# upload originals / secrets
+/data/
+/secrets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vercel
+.vercel
+
+# cursor
+.cursor

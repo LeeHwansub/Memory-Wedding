@@ -1,0 +1,96 @@
+export type AiJobStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+/** Notion FR-AI-004 장면 분류 */
+export type SceneCategory =
+  | "ENTRANCE"
+  | "SONG"
+  | "GROUP_PHOTO"
+  | "RECEPTION"
+  | "OTHER";
+
+export type AiMediaFileType = "PHOTO" | "VIDEO";
+
+export type AiJob = {
+  id: number;
+  status: AiJobStatus;
+  totalFiles: number;
+  processedFiles: number;
+  errorMessage?: string | null;
+  analyzerMode?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+};
+
+export type AiPhotoResult = {
+  id: number;
+  uploadFileId: number;
+  originalFilename: string;
+  guestName: string;
+  contentPath: string;
+  fileType?: AiMediaFileType;
+  sceneCategory: SceneCategory;
+  bestShot: boolean;
+  confidence?: number | null;
+  people?: string[];
+  objects?: string[];
+  place?: string | null;
+  frameCount?: number | null;
+  duplicate?: boolean;
+  analyzedAt?: string | null;
+};
+
+export type AiDashboard = {
+  latestJob: AiJob | null;
+  results: AiPhotoResult[];
+  bestShots: AiPhotoResult[];
+  analyzerMode: "gemini" | "mock" | string;
+  minConfidence: number;
+  excludedCount: number;
+  latestVideoJob?: AiVideoJob | null;
+};
+
+export type HighlightStyle = "CLASSIC" | "SOFT" | "CINEMATIC";
+export type HighlightLength = "SHORT" | "MEDIUM" | "LONG";
+
+export type CreateHighlightRequest = {
+  style?: HighlightStyle;
+  length?: HighlightLength;
+  bgm?: boolean;
+  subtitles?: boolean;
+  aiRecommend?: boolean;
+};
+
+export type AiVideoJob = {
+  id: number;
+  status: AiJobStatus;
+  clipCount: number;
+  processedClips?: number;
+  fileSize?: number | null;
+  contentPath?: string | null;
+  driveFileId?: string | null;
+  driveSynced?: boolean;
+  errorMessage?: string | null;
+  style?: HighlightStyle | string | null;
+  length?: HighlightLength | string | null;
+  bgm?: boolean | null;
+  subtitles?: boolean | null;
+  aiRecommend?: boolean | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+};
+
+export const SCENE_LABELS: Record<SceneCategory, string> = {
+  ENTRANCE: "입장",
+  SONG: "축가",
+  GROUP_PHOTO: "단체사진",
+  RECEPTION: "피로연",
+  OTHER: "기타",
+};
+
+export function isVideoResult(item: AiPhotoResult): boolean {
+  if (item.fileType === "VIDEO") return true;
+  if (item.fileType === "PHOTO") return false;
+  return (item.frameCount ?? null) !== null;
+}
